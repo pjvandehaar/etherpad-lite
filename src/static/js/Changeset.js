@@ -624,15 +624,6 @@ class TextLinesMutator {
   }
 
   /**
-   * Adds and/or removes entries at a specific offset in `lines`. Called when leaving the splice.
-   *
-   * @param {Array} s - curSplice
-   */
-  _linesApplySplice(s) {
-    this._lines.splice(...s);
-  }
-
-  /**
    * Get a line from `lines` at given index.
    *
    * @param {number} idx - an index
@@ -692,7 +683,7 @@ class TextLinesMutator {
    * close or TODO(doc).
    */
   _leaveSplice() {
-    this._linesApplySplice(this._curSplice);
+    this._lines.splice(...this._curSplice);
     this._curSplice.length = 2;
     this._curSplice[0] = this._curSplice[1] = 0;
     this._inSplice = false;
