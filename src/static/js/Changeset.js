@@ -352,41 +352,39 @@ class MergingOpAssembler {
   }
 
   _flush(isEndDocument) {
-    if (this._bufOp.opcode) {
-      if (isEndDocument && this._bufOp.opcode === '=' && !this._bufOp.attribs) {
-        // final merged keep, leave it implicit
-      } else {
+    if (!this._bufOp.opcode) return;
+    if (isEndDocument && this._bufOp.opcode === '=' && !this._bufOp.attribs) {
+      // final merged keep, leave it implicit
+    } else {
+      this._assem.append(this._bufOp);
+      if (this._bufOpAdditionalCharsAfterNewline) {
+        this._bufOp.chars = this._bufOpAdditionalCharsAfterNewline;
+        this._bufOp.lines = 0;
         this._assem.append(this._bufOp);
-        if (this._bufOpAdditionalCharsAfterNewline) {
-          this._bufOp.chars = this._bufOpAdditionalCharsAfterNewline;
-          this._bufOp.lines = 0;
-          this._assem.append(this._bufOp);
-          this._bufOpAdditionalCharsAfterNewline = 0;
-        }
+        this._bufOpAdditionalCharsAfterNewline = 0;
       }
-      this._bufOp.opcode = '';
     }
+    this._bufOp.opcode = '';
   }
 
   append(op) {
-    if (op.chars > 0) {
-      if (this._bufOp.opcode === op.opcode && this._bufOp.attribs === op.attribs) {
-        if (op.lines > 0) {
-          // this._bufOp and additional chars are all mergeable into a multi-line op
-          this._bufOp.chars += this._bufOpAdditionalCharsAfterNewline + op.chars;
-          this._bufOp.lines += op.lines;
-          this._bufOpAdditionalCharsAfterNewline = 0;
-        } else if (this._bufOp.lines === 0) {
-          // both this._bufOp and op are in-line
-          this._bufOp.chars += op.chars;
-        } else {
-          // append in-line text to multi-line this._bufOp
-          this._bufOpAdditionalCharsAfterNewline += op.chars;
-        }
+    if (op.chars <= 0) return;
+    if (this._bufOp.opcode === op.opcode && this._bufOp.attribs === op.attribs) {
+      if (op.lines > 0) {
+        // this._bufOp and additional chars are all mergeable into a multi-line op
+        this._bufOp.chars += this._bufOpAdditionalCharsAfterNewline + op.chars;
+        this._bufOp.lines += op.lines;
+        this._bufOpAdditionalCharsAfterNewline = 0;
+      } else if (this._bufOp.lines === 0) {
+        // both this._bufOp and op are in-line
+        this._bufOp.chars += op.chars;
       } else {
-        this._flush();
-        copyOp(op, this._bufOp);
+        // append in-line text to multi-line this._bufOp
+        this._bufOpAdditionalCharsAfterNewline += op.chars;
       }
+    } else {
+      this._flush();
+      copyOp(op, this._bufOp);
     }
   }
 
@@ -788,29 +786,28 @@ class TextLinesMutator {
    * @param {boolean} includeInSplice - indicates if attributes are present
    */
   skipLines(L, includeInSplice) {
-    if (L) {
-      if (includeInSplice) {
-        if (!this._inSplice) this._enterSplice();
-        // TODO(doc) should this count the number of characters that are skipped to check?
-        for (let i = 0; i < L; i++) {
-          this._curCol = 0;
-          this._putCurLineInSplice();
-          this._curLine++;
-        }
-      } else {
-        if (this._inSplice) {
-          if (L > 1) {
-            // TODO(doc) figure out why single lines are incorporated into splice instead of ignored
-            this._leaveSplice();
-          } else {
-            this._putCurLineInSplice();
-          }
-        }
-        this._curLine += L;
+    if (!L) return;
+    if (includeInSplice) {
+      if (!this._inSplice) this._enterSplice();
+      // TODO(doc) should this count the number of characters that are skipped to check?
+      for (let i = 0; i < L; i++) {
         this._curCol = 0;
+        this._putCurLineInSplice();
+        this._curLine++;
       }
-      // tests case foo in remove(), which isn't otherwise covered in current impl
+    } else {
+      if (this._inSplice) {
+        if (L > 1) {
+          // TODO(doc) figure out why single lines are incorporated into splice instead of ignored
+          this._leaveSplice();
+        } else {
+          this._putCurLineInSplice();
+        }
+      }
+      this._curLine += L;
+      this._curCol = 0;
     }
+    // tests case foo in remove(), which isn't otherwise covered in current impl
   }
 
   /**
@@ -821,18 +818,17 @@ class TextLinesMutator {
    * @param {boolean} includeInSplice - indicates if attributes are present
    */
   skip(N, L, includeInSplice) {
-    if (N) {
-      if (L) {
-        this.skipLines(L, includeInSplice);
-      } else {
-        if (includeInSplice && !this._inSplice) this._enterSplice();
-        if (this._inSplice) {
-          // although the line is put into splice curLine is not increased, because
-          // only some chars are skipped, not the whole line
-          this._putCurLineInSplice();
-        }
-        this._curCol += N;
+    if (!N) return;
+    if (L) {
+      this.skipLines(L, includeInSplice);
+    } else {
+      if (includeInSplice && !this._inSplice) this._enterSplice();
+      if (this._inSplice) {
+        // although the line is put into splice curLine is not increased, because
+        // only some chars are skipped, not the whole line
+        this._putCurLineInSplice();
       }
+      this._curCol += N;
     }
   }
 
@@ -843,39 +839,39 @@ class TextLinesMutator {
    * @returns {string}
    */
   removeLines(L) {
-    let removed = '';
-    if (L) {
-      if (!this._inSplice) this._enterSplice();
+    if (!L) return '';
+    if (!this._inSplice) this._enterSplice();
 
-      /**
-       * Gets a string of joined lines after the end of the splice.
-       *
-       * @param {number} k - number of lines
-       * @returns {string} joined lines
-       */
-      const nextKLinesText = (k) => {
-        const m = this._curSplice[0] + this._curSplice[1];
-        return this._linesSlice(m, m + k).join('');
-      };
-      if (this._isCurLineInSplice()) {
-        if (this._curCol === 0) {
-          removed = this._curSplice[this._curSplice.length - 1];
-          this._curSplice.length--;
-          removed += nextKLinesText(L - 1);
-          this._curSplice[1] += L - 1;
-        } else {
-          removed = nextKLinesText(L - 1);
-          this._curSplice[1] += L - 1;
-          const sline = this._curSplice.length - 1;
-          removed = this._curSplice[sline].substring(this._curCol) + removed;
-          this._curSplice[sline] = this._curSplice[sline].substring(0, this._curCol) +
-              this._linesGet(this._curSplice[0] + this._curSplice[1]);
-          this._curSplice[1] += 1;
-        }
+    /**
+     * Gets a string of joined lines after the end of the splice.
+     *
+     * @param {number} k - number of lines
+     * @returns {string} joined lines
+     */
+    const nextKLinesText = (k) => {
+      const m = this._curSplice[0] + this._curSplice[1];
+      return this._linesSlice(m, m + k).join('');
+    };
+
+    let removed = '';
+    if (this._isCurLineInSplice()) {
+      if (this._curCol === 0) {
+        removed = this._curSplice[this._curSplice.length - 1];
+        this._curSplice.length--;
+        removed += nextKLinesText(L - 1);
+        this._curSplice[1] += L - 1;
       } else {
-        removed = nextKLinesText(L);
-        this._curSplice[1] += L;
+        removed = nextKLinesText(L - 1);
+        this._curSplice[1] += L - 1;
+        const sline = this._curSplice.length - 1;
+        removed = this._curSplice[sline].substring(this._curCol) + removed;
+        this._curSplice[sline] = this._curSplice[sline].substring(0, this._curCol) +
+            this._linesGet(this._curSplice[0] + this._curSplice[1]);
+        this._curSplice[1] += 1;
       }
+    } else {
+      removed = nextKLinesText(L);
+      this._curSplice[1] += L;
     }
     return removed;
   }
@@ -888,20 +884,15 @@ class TextLinesMutator {
    * @returns {string}
    */
   remove(N, L) {
-    let removed = '';
-    if (N) {
-      if (L) {
-        return this.removeLines(L);
-      } else {
-        if (!this._inSplice) this._enterSplice();
-        // although the line is put into splice, curLine is not increased, because
-        // only some chars are removed not the whole line
-        const sline = this._putCurLineInSplice();
-        removed = this._curSplice[sline].substring(this._curCol, this._curCol + N);
-        this._curSplice[sline] = this._curSplice[sline].substring(0, this._curCol) +
-            this._curSplice[sline].substring(this._curCol + N);
-      }
-    }
+    if (!N) return '';
+    if (L) return this.removeLines(L);
+    if (!this._inSplice) this._enterSplice();
+    // although the line is put into splice, curLine is not increased, because
+    // only some chars are removed not the whole line
+    const sline = this._putCurLineInSplice();
+    const removed = this._curSplice[sline].substring(this._curCol, this._curCol + N);
+    this._curSplice[sline] = this._curSplice[sline].substring(0, this._curCol) +
+        this._curSplice[sline].substring(this._curCol + N);
     return removed;
   }
 
@@ -912,45 +903,44 @@ class TextLinesMutator {
    * @param {number} L - number of newlines in text
    */
   insert(text, L) {
-    if (text) {
-      if (!this._inSplice) this._enterSplice();
-      if (L) {
-        const newLines = exports.splitTextLines(text);
-        if (this._isCurLineInSplice()) {
-          const sline = this._curSplice.length - 1;
-          const theLine = this._curSplice[sline];
-          const lineCol = this._curCol;
-          // insert the first new line
-          this._curSplice[sline] = theLine.substring(0, lineCol) + newLines[0];
-          this._curLine++;
-          newLines.splice(0, 1);
-          // insert the remaining new lines
-          Array.prototype.push.apply(this._curSplice, newLines);
-          this._curLine += newLines.length;
-          // insert the remaining chars from the "old" line (e.g. the line we were in
-          // when we started to insert new lines)
-          this._curSplice.push(theLine.substring(lineCol));
-          this._curCol = 0; // TODO(doc) why is this not set to the length of last line?
-        } else {
-          Array.prototype.push.apply(this._curSplice, newLines);
-          this._curLine += newLines.length;
-        }
+    if (!text) return;
+    if (!this._inSplice) this._enterSplice();
+    if (L) {
+      const newLines = exports.splitTextLines(text);
+      if (this._isCurLineInSplice()) {
+        const sline = this._curSplice.length - 1;
+        const theLine = this._curSplice[sline];
+        const lineCol = this._curCol;
+        // insert the first new line
+        this._curSplice[sline] = theLine.substring(0, lineCol) + newLines[0];
+        this._curLine++;
+        newLines.splice(0, 1);
+        // insert the remaining new lines
+        Array.prototype.push.apply(this._curSplice, newLines);
+        this._curLine += newLines.length;
+        // insert the remaining chars from the "old" line (e.g. the line we were in
+        // when we started to insert new lines)
+        this._curSplice.push(theLine.substring(lineCol));
+        this._curCol = 0; // TODO(doc) why is this not set to the length of last line?
       } else {
-        // there are no additional lines
-        // although the line is put into splice, curLine is not increased, because
-        // there may be more chars in the line (newline is not reached)
-        const sline = this._putCurLineInSplice();
-        if (!this._curSplice[sline]) {
-          const err = new Error(
-              'curSplice[sline] not populated, actual curSplice contents is ' +
-              `${JSON.stringify(this._curSplice)}. Possibly related to ` +
-              'https://github.com/ether/etherpad-lite/issues/2802');
-          console.error(err.stack || err.toString());
-        }
-        this._curSplice[sline] = this._curSplice[sline].substring(0, this._curCol) + text +
-            this._curSplice[sline].substring(this._curCol);
-        this._curCol += text.length;
+        Array.prototype.push.apply(this._curSplice, newLines);
+        this._curLine += newLines.length;
       }
+    } else {
+      // there are no additional lines
+      // although the line is put into splice, curLine is not increased, because
+      // there may be more chars in the line (newline is not reached)
+      const sline = this._putCurLineInSplice();
+      if (!this._curSplice[sline]) {
+        const err = new Error(
+            'curSplice[sline] not populated, actual curSplice contents is ' +
+            `${JSON.stringify(this._curSplice)}. Possibly related to ` +
+            'https://github.com/ether/etherpad-lite/issues/2802');
+        console.error(err.stack || err.toString());
+      }
+      this._curSplice[sline] = this._curSplice[sline].substring(0, this._curCol) + text +
+          this._curSplice[sline].substring(this._curCol);
+      this._curCol += text.length;
     }
   }
 
@@ -1169,15 +1159,14 @@ exports.composeAttributes = (att1, att2, resultIsMutation, pool) => {
     let found = false;
     for (let i = 0; i < atts.length; i++) {
       const oldPair = atts[i];
-      if (oldPair[0] === pair[0]) {
-        if (pair[1] || resultIsMutation) {
-          oldPair[1] = pair[1];
-        } else {
-          atts.splice(i, 1);
-        }
-        found = true;
-        break;
+      if (oldPair[0] !== pair[0]) continue;
+      if (pair[1] || resultIsMutation) {
+        oldPair[1] = pair[1];
+      } else {
+        atts.splice(i, 1);
       }
+      found = true;
+      break;
     }
     if ((!found) && (pair[1] || resultIsMutation)) {
       atts.push(pair);
@@ -1295,12 +1284,11 @@ exports.mutateAttributionLines = (cs, lines, pool) => {
       lineAssem = new MergingOpAssembler();
     }
     lineAssem.append(op);
-    if (op.lines > 0) {
-      assert(op.lines === 1, "Can't have op.lines of ", op.lines, ' in attribution lines');
-      // ship it to the mut
-      mut.insert(lineAssem.toString(), 1);
-      lineAssem = null;
-    }
+    if (op.lines <= 0) return;
+    assert(op.lines === 1, "Can't have op.lines of ", op.lines, ' in attribution lines');
+    // ship it to the mut
+    mut.insert(lineAssem.toString(), 1);
+    lineAssem = null;
   };
 
   let csOp = new exports.Op();
@@ -1446,16 +1434,11 @@ exports.compose = (cs1, cs2, pool) => {
  */
 exports.attributeTester = (attribPair, pool) => {
   const never = (attribs) => false;
-  if (!pool) {
-    return never;
-  }
+  if (!pool) return never;
   const attribNum = pool.putAttrib(attribPair, true);
-  if (attribNum < 0) {
-    return never;
-  } else {
-    const re = new RegExp(`\\*${exports.numToString(attribNum)}(?!\\w)`);
-    return (attribs) => re.test(attribs);
-  }
+  if (attribNum < 0) return never;
+  const re = new RegExp(`\\*${exports.numToString(attribNum)}(?!\\w)`);
+  return (attribs) => re.test(attribs);
 };
 
 /**
@@ -1731,14 +1714,11 @@ exports.applyToAText = (cs, atext, pool) => ({
  * @returns {AText}
  */
 exports.cloneAText = (atext) => {
-  if (atext) {
-    return {
-      text: atext.text,
-      attribs: atext.attribs,
-    };
-  } else {
-    error('atext is null');
-  }
+  if (!atext) error('atext is null');
+  return {
+    text: atext.text,
+    attribs: atext.attribs,
+  };
 };
 
 /**
@@ -1828,14 +1808,13 @@ exports.opAttributeValue = (op, key, pool) => exports.attribsAttributeValue(op.a
  * @returns {string}
  */
 exports.attribsAttributeValue = (attribs, key, pool) => {
+  if (!attribs) return '';
   let value = '';
-  if (attribs) {
-    exports.eachAttribNumber(attribs, (n) => {
-      if (pool.getAttribKey(n) === key) {
-        value = pool.getAttribValue(n);
-      }
-    });
-  }
+  exports.eachAttribNumber(attribs, (n) => {
+    if (pool.getAttribKey(n) === key) {
+      value = pool.getAttribValue(n);
+    }
+  });
   return value;
 };
 
@@ -1931,16 +1910,15 @@ exports.subattribution = (astr, start, optEnd) => {
   const csOp = new exports.Op();
 
   const doCsOp = () => {
-    if (csOp.chars) {
-      while (csOp.opcode && (attOp.opcode || iter.hasNext())) {
-        if (!attOp.opcode) attOp = iter.next();
-        if (csOp.opcode && attOp.opcode && csOp.chars >= attOp.chars &&
-              attOp.lines > 0 && csOp.lines <= 0) {
-          csOp.lines++;
-        }
-        const opOut = slicerZipperFunc(attOp, csOp, null);
-        if (opOut.opcode) assem.append(opOut);
+    if (!csOp.chars) return;
+    while (csOp.opcode && (attOp.opcode || iter.hasNext())) {
+      if (!attOp.opcode) attOp = iter.next();
+      if (csOp.opcode && attOp.opcode && csOp.chars >= attOp.chars &&
+          attOp.lines > 0 && csOp.lines <= 0) {
+        csOp.lines++;
       }
+      const opOut = slicerZipperFunc(attOp, csOp, null);
+      if (opOut.opcode) assem.append(opOut);
     }
   };
 
@@ -2282,13 +2260,12 @@ const followAttributes = (att1, att2, pool) => {
     const pair1 = pool.getAttrib(exports.parseNum(a));
     for (let i = 0; i < atts.length; i++) {
       const pair2 = atts[i];
-      if (pair1[0] === pair2[0]) {
-        if (pair1[1] <= pair2[1]) {
-          // winner of merge is pair1, delete this attribute
-          atts.splice(i, 1);
-        }
-        break;
+      if (pair1[0] !== pair2[0]) continue;
+      if (pair1[1] <= pair2[1]) {
+        // winner of merge is pair1, delete this attribute
+        atts.splice(i, 1);
       }
+      break;
     }
     return '';
   });
