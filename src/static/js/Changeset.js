@@ -30,6 +30,14 @@
 
 const AttributePool = require('./AttributePool');
 
+const warnDeprecated = (...args) => {
+  const err = new Error();
+  if (Error.captureStackTrace) Error.captureStackTrace(err, warnDeprecated);
+  err.name = '';
+  if (err.stack) args.push(err.stack);
+  console.warn(...args);
+};
+
 /**
  * This method is called whenever there is an error in the sync process.
  *
@@ -72,18 +80,55 @@ exports.numToString = (num) => num.toString(36).toLowerCase();
 
 /**
  * An operation to apply to a shared document.
- *
- * @typedef {object} Op
- * @property {('+'|'-'|'='|'')} opcode - The operation's operator: '=' (keep), '+' (insert), or '-'
- *     (delete). This may also be '' to create a null (invalid) operation, which is sometimes used
- *     to indicate the lack of an operation.
- * @property {number} chars - The number of characters to keep, insert, or delete.
- * @property {number} lines - The number of characters among the `chars` characters that are
- *     newlines.
- * @property {string} attribs - Stores the attributes that apply to the characters ('+' and '-' ops
- *     only). Represented as a repeated sequence of '*I' where I is a base-36 integer identifying
- *     the attribute in the attribute pool.
  */
+exports.Op = class {
+  /**
+   * @param {(''|'='|'+'|'-')} [opcode=''] - The operation's operator.
+   */
+  constructor(opcode = '') {
+    /**
+     * The operation's operator: '=' (keep), '+' (insert), or '-' (delete). This may also be '' to
+     * create a null (invalid) operation, which is sometimes used to indicate the lack of an
+     * operation.
+     *
+     * @type {(''|'='|'+'|'-')}
+     * @public
+     */
+    this.opcode = opcode;
+
+    /**
+     * The number of characters to keep, insert, or delete.
+     *
+     * @type {number}
+     * @public
+     */
+    this.chars = 0;
+
+    /**
+     * The number of characters among the `chars` characters that are newlines.
+     *
+     * @type {number}
+     * @public
+     */
+    this.lines = 0;
+
+    /**
+     * Stores the attributes that apply to the characters ('+' and '-' ops only). Represented as a
+     * repeated sequence of '*I' where I is a base-36 integer identifying the attribute in the
+     * attribute pool.
+     *
+     * @type {string}
+     * @public
+     */
+    this.attribs = '';
+  }
+
+  toString() {
+    if (!this.opcode) throw new TypeError('null op');
+    const l = this.lines ? `|${exports.numToString(this.lines)}` : '';
+    return (this.attribs || '') + l + this.opcode + exports.numToString(this.chars);
+  }
+};
 
 /**
  * Describes changes to apply to a document. Does not include the attribute pool or the original
@@ -149,8 +194,7 @@ exports.opIterator = (opsStr, optStartIndex) => {
   };
   let regexResult = nextRegexMatch();
 
-  const next = (optOp) => {
-    const op = optOp || exports.newOp();
+  const next = (op = new exports.Op()) => {
     if (regexResult[0]) {
       op.attribs = regexResult[1];
       op.lines = exports.parseNum(regexResult[2] || 0);
@@ -189,15 +233,14 @@ const clearOp = (op) => {
 /**
  * Creates a new Op object
  *
+ * @deprecated Use the `Op` class instead.
  * @param {('+'|'-'|'='|'')} [optOpcode=''] - The operation's operator.
  * @returns {Op}
  */
-exports.newOp = (optOpcode) => ({
-  opcode: (optOpcode || ''),
-  chars: 0,
-  lines: 0,
-  attribs: '',
-});
+exports.newOp = (optOpcode) => {
+  warnDeprecated('Changeset.newOp() is deprecated; use the Changeset.Op class instead');
+  return new exports.Op(optOpcode);
+};
 
 /**
  * Copies op1 to op2
@@ -353,7 +396,7 @@ exports.smartOpAssembler = () => {
   };
 
   const appendOpWithText = (opcode, text, attribs, pool) => {
-    const op = exports.newOp(opcode);
+    const op = new exports.Op(opcode);
     op.attribs = exports.makeAttribsString(opcode, attribs, pool);
     const lastNewlinePos = text.lastIndexOf('\n');
     if (lastNewlinePos < 0) {
@@ -405,7 +448,7 @@ exports.smartOpAssembler = () => {
  */
 exports.mergingOpAssembler = () => {
   const assem = exports.opAssembler();
-  const bufOp = exports.newOp();
+  const bufOp = new exports.Op();
 
   // If we get, for example, insertions [xxx\n,yyy], those don't merge,
   // but if we get [xxx\n,yyy,zzz\n], that merges to [xxx\nyyyzzz\n].
@@ -483,12 +526,8 @@ exports.opAssembler = () => {
    * @param {Op} op - Operation to add. Ownership remains with the caller.
    */
   const append = (op) => {
-    pieces.push(op.attribs);
-    if (op.lines) {
-      pieces.push('|', exports.numToString(op.lines));
-    }
-    pieces.push(op.opcode);
-    pieces.push(exports.numToString(op.chars));
+    assert(op instanceof exports.Op, 'argument must be an instance of Op');
+    pieces.push(op.toString());
   };
 
   const toString = () => pieces.join('');
@@ -934,9 +973,9 @@ const applyZip = (in1, in2, func) => {
   const iter1 = exports.opIterator(in1);
   const iter2 = exports.opIterator(in2);
   const assem = exports.smartOpAssembler();
-  const op1 = exports.newOp();
-  const op2 = exports.newOp();
-  const opOut = exports.newOp();
+  const op1 = new exports.Op();
+  const op2 = new exports.Op();
+  const opOut = new exports.Op();
   while (op1.opcode || iter1.hasNext() || op2.opcode || iter2.hasNext()) {
     if ((!op1.opcode) && iter1.hasNext()) iter1.next(op1);
     if ((!op2.opcode) && iter2.hasNext()) iter2.next(op2);
@@ -1287,9 +1326,9 @@ exports.mutateAttributionLines = (cs, lines, pool) => {
     }
   };
 
-  const csOp = exports.newOp();
-  const attOp = exports.newOp();
-  const opOut = exports.newOp();
+  const csOp = new exports.Op();
+  const attOp = new exports.Op();
+  const opOut = new exports.Op();
   while (csOp.opcode || csIter.hasNext() || attOp.opcode || isNextMutOp()) {
     if ((!csOp.opcode) && csIter.hasNext()) {
       csIter.next(csOp);
@@ -1761,7 +1800,7 @@ exports.copyAText = (atext1, atext2) => {
 exports.appendATextToAssembler = (atext, assem) => {
   // intentionally skips last newline char of atext
   const iter = exports.opIterator(atext.attribs);
-  const op = exports.newOp();
+  const op = new exports.Op();
   while (iter.hasNext()) {
     iter.next(op);
     if (!iter.hasNext()) {
@@ -1865,7 +1904,7 @@ exports.attribsAttributeValue = (attribs, key, pool) => {
  */
 exports.builder = (oldLen) => {
   const assem = exports.smartOpAssembler();
-  const o = exports.newOp();
+  const o = new exports.Op();
   const charBank = exports.stringAssembler();
 
   const self = {
@@ -1936,9 +1975,9 @@ exports.makeAttribsString = (opcode, attribs, pool) => {
 exports.subattribution = (astr, start, optEnd) => {
   const iter = exports.opIterator(astr, 0);
   const assem = exports.smartOpAssembler();
-  const attOp = exports.newOp();
-  const csOp = exports.newOp();
-  const opOut = exports.newOp();
+  const attOp = new exports.Op();
+  const csOp = new exports.Op();
+  const opOut = new exports.Op();
 
   const doCsOp = () => {
     if (csOp.chars) {
@@ -2010,7 +2049,7 @@ exports.inverse = (cs, lines, alines, pool) => {
   let curChar = 0;
   let curLineOpIter = null;
   let curLineOpIterLine;
-  const curLineNextOp = exports.newOp('+');
+  const curLineNextOp = new exports.Op('+');
 
   const unpacked = exports.unpack(cs);
   const csIter = exports.opIterator(unpacked.ops);

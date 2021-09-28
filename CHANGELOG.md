@@ -31,6 +31,8 @@
       different. See
       [citizenos/ep_image_upload#49](https://github.com/citizenos/ep_image_upload/pull/49)
       for an example fix.
+  * The `newOp()` function in `src/static/js/Changeset.js` is deprecated; use
+    the new `Op` class instead.
 
 ### Notable enhancements
 

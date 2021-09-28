@@ -114,36 +114,18 @@ This is an atext. An atext has two parts: text and attribs. The text is just the
 { next: [Function: next],
   hasNext: [Function: hasNext],
   lastIndex: [Function: lastIndex] }
-> opiterator.next()
-{ opcode: '+',
-  chars: 9,
-  lines: 0,
-  attribs: '*0*1' }
-> opiterator.next()
-{ opcode: '+',
-  chars: 1,
-  lines: 1,
-  attribs: '*0' }
-> opiterator.next()
-{ opcode: '+',
-  chars: 11,
-  lines: 0,
-  attribs: '*0*1*2' }
-> opiterator.next()
-{ opcode: '+',
-  chars: 1,
-  lines: 1,
-  attribs: '' }
-> opiterator.next()
-{ opcode: '+',
-  chars: 11,
-  lines: 0,
-  attribs: '*0' }
-> opiterator.next()
-{ opcode: '+',
-  chars: 2,
-  lines: 2,
-  attribs: '' }
+> opiterator.next();
+Op { opcode: '+', chars: 9, lines: 0, attribs: '*0*1' }
+> opiterator.next();
+Op { opcode: '+', chars: 1, lines: 1, attribs: '*0' }
+> opiterator.next();
+Op { opcode: '+', chars: 11, lines: 0, attribs: '*0*1*2' }
+> opiterator.next();
+Op { opcode: '+', chars: 1, lines: 1, attribs: '' }
+> opiterator.next();
+Op { opcode: '+', chars: 11, lines: 0, attribs: '*0' }
+> opiterator.next();
+Op { opcode: '+', chars: 2, lines: 2, attribs: '' }
 ```
 
 The attribs are again a bunch of operators like .ops in the changeset was. But these operators are only + operators. They describe which part of the text has which attributes
