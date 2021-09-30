@@ -166,13 +166,12 @@ exports.newLen = (cs) => exports.unpack(cs).newLen;
 exports.OpIter = class {
   /**
    * @param {string} opsStr - String encoding the change operations to iterate over.
-   * @param {number} [startIndex=0] - Start position in `opsStr`.
    */
-  constructor(opsStr, startIndex = 0) {
+  constructor(opsStr) {
     this._opsStr = opsStr;
     this._regex = /((?:\*[0-9a-z]+)*)(?:\|([0-9a-z]+))?([-+=])([0-9a-z]+)|\?|/g;
-    this._curIndex = startIndex;
-    this._prevIndex = this._curIndex;
+    this._curIndex = 0;
+    this._prevIndex = 0;
     this._regexResult = this._nextRegexMatch();
   }
 
@@ -199,17 +198,47 @@ exports.OpIter = class {
    *
    * Note: This does NOT implement the ECMAScript iterator protocol.
    *
+   * @throws {Error} If there are no more operations.
+   * @returns {Op} The next operation.
+   */
+  next() {
+    if (!this.hasNext()) throw new Error('no more operations');
+    const op = new exports.Op(this._regexResult[3]);
+    op.attribs = this._regexResult[1];
+    op.lines = exports.parseNum(this._regexResult[2] || 0);
+    op.chars = exports.parseNum(this._regexResult[4]);
+    this._regexResult = this._nextRegexMatch();
+    return op;
+  }
+};
+
+/**
+ * @deprecated Use `OpIter` instead.
+ */
+class LegacyOpIter extends exports.OpIter {
+  /**
+   * @param {string} opsStr - String encoding of the change operations to perform.
+   * @param {number} [startIndex=0] - Start position in `opsStr`.
+   */
+  constructor(opsStr, startIndex = 0) {
+    if (startIndex) opsStr = opsStr.slice(startIndex);
+    super(opsStr);
+    this._startIndex = startIndex;
+  }
+
+  /**
+   * Returns the next operation object and advances the iterator.
+   *
+   * Note: This does NOT implement the ECMAScript iterator protocol.
+   *
    * @param {Op} [opOut] - Deprecated. Operation object to recycle for the return value.
    * @returns {Op} The next operation, or an operation with a falsy `opcode` property if there are
    *     no more operations.
    */
   next(opOut = new exports.Op()) {
     if (this.hasNext()) {
-      opOut.attribs = this._regexResult[1];
-      opOut.lines = exports.parseNum(this._regexResult[2] || 0);
-      opOut.opcode = this._regexResult[3];
-      opOut.chars = exports.parseNum(this._regexResult[4]);
-      this._regexResult = this._nextRegexMatch();
+      const op = super.next();
+      copyOp(op, opOut);
     } else {
       clearOp(opOut);
     }
@@ -217,9 +246,9 @@ exports.OpIter = class {
   }
 
   lastIndex() {
-    return this._prevIndex;
+    return this._prevIndex + this._startIndex;
   }
-};
+}
 
 /**
  * Creates an iterator which decodes string changeset operations.
@@ -230,7 +259,7 @@ exports.OpIter = class {
  */
 exports.opIterator = (opsStr, optStartIndex) => {
   warnDeprecated('Changeset.opIterator() is deprecated; use the Changeset.OpIter class instead');
-  return new exports.OpIter(opsStr, optStartIndex);
+  return new LegacyOpIter(opsStr, optStartIndex);
 };
 
 /**
