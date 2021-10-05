@@ -314,12 +314,28 @@ const copyOp = (op1, op2 = new exports.Op()) => Object.assign(op2, op1);
 
 /**
  * Serializes a sequence of Ops.
- *
- * @typedef {object} OpAssembler
- * @property {Function} append -
- * @property {Function} clear -
- * @property {Function} toString -
  */
+class OpAssembler {
+  constructor() {
+    this._pieces = [];
+  }
+
+  /**
+   * @param {Op} op - Operation to add. Ownership remains with the caller.
+   */
+  append(op) {
+    assert(op instanceof exports.Op, 'argument must be an instance of Op');
+    this._pieces.push(op.toString());
+  }
+
+  toString() {
+    return this._pieces.join('');
+  }
+
+  clear() {
+    this._pieces.length = 0;
+  }
+}
 
 /**
  * Efficiently merges consecutive operations that are mergeable, ignores no-ops, and drops final
@@ -574,28 +590,7 @@ exports.mergingOpAssembler = () => {
 /**
  * @returns {OpAssembler}
  */
-exports.opAssembler = () => {
-  const pieces = [];
-
-  /**
-   * @param {Op} op - Operation to add. Ownership remains with the caller.
-   */
-  const append = (op) => {
-    assert(op instanceof exports.Op, 'argument must be an instance of Op');
-    pieces.push(op.toString());
-  };
-
-  const toString = () => pieces.join('');
-
-  const clear = () => {
-    pieces.length = 0;
-  };
-  return {
-    append,
-    toString,
-    clear,
-  };
-};
+exports.opAssembler = () => new OpAssembler();
 
 /**
  * A custom made String Iterator
