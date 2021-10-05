@@ -340,13 +340,70 @@ class OpAssembler {
 /**
  * Efficiently merges consecutive operations that are mergeable, ignores no-ops, and drops final
  * pure "keeps". It does not re-order operations.
- *
- * @typedef {object} MergingOpAssembler
- * @property {Function} append -
- * @property {Function} clear -
- * @property {Function} endDocument -
- * @property {Function} toString -
  */
+class MergingOpAssembler {
+  constructor() {
+    this._assem = new OpAssembler();
+    this._bufOp = new exports.Op();
+    // If we get, for example, insertions [xxx\n,yyy], those don't merge, but if we get
+    // [xxx\n,yyy,zzz\n], that merges to [xxx\nyyyzzz\n]. This variable stores the length of yyy and
+    // any other newline-less ops immediately after it.
+    this._bufOpAdditionalCharsAfterNewline = 0;
+  }
+
+  _flush(isEndDocument) {
+    if (this._bufOp.opcode) {
+      if (isEndDocument && this._bufOp.opcode === '=' && !this._bufOp.attribs) {
+        // final merged keep, leave it implicit
+      } else {
+        this._assem.append(this._bufOp);
+        if (this._bufOpAdditionalCharsAfterNewline) {
+          this._bufOp.chars = this._bufOpAdditionalCharsAfterNewline;
+          this._bufOp.lines = 0;
+          this._assem.append(this._bufOp);
+          this._bufOpAdditionalCharsAfterNewline = 0;
+        }
+      }
+      this._bufOp.opcode = '';
+    }
+  }
+
+  append(op) {
+    if (op.chars > 0) {
+      if (this._bufOp.opcode === op.opcode && this._bufOp.attribs === op.attribs) {
+        if (op.lines > 0) {
+          // this._bufOp and additional chars are all mergeable into a multi-line op
+          this._bufOp.chars += this._bufOpAdditionalCharsAfterNewline + op.chars;
+          this._bufOp.lines += op.lines;
+          this._bufOpAdditionalCharsAfterNewline = 0;
+        } else if (this._bufOp.lines === 0) {
+          // both this._bufOp and op are in-line
+          this._bufOp.chars += op.chars;
+        } else {
+          // append in-line text to multi-line this._bufOp
+          this._bufOpAdditionalCharsAfterNewline += op.chars;
+        }
+      } else {
+        this._flush();
+        copyOp(op, this._bufOp);
+      }
+    }
+  }
+
+  endDocument() {
+    this._flush(true);
+  }
+
+  toString() {
+    this._flush();
+    return this._assem.toString();
+  }
+
+  clear() {
+    this._assem.clear();
+    clearOp(this._bufOp);
+  }
+}
 
 /**
  * Creates an object that allows you to append operations (type Op) and also compresses them if
@@ -422,9 +479,9 @@ exports.checkRep = (cs) => {
  * @returns {SmartOpAssembler}
  */
 exports.smartOpAssembler = () => {
-  const minusAssem = exports.mergingOpAssembler();
-  const plusAssem = exports.mergingOpAssembler();
-  const keepAssem = exports.mergingOpAssembler();
+  const minusAssem = new MergingOpAssembler();
+  const plusAssem = new MergingOpAssembler();
+  const keepAssem = new MergingOpAssembler();
   const assem = exports.stringAssembler();
   let lastOpcode = '';
   let lengthChange = 0;
@@ -517,75 +574,7 @@ exports.smartOpAssembler = () => {
 /**
  * @returns {MergingOpAssembler}
  */
-exports.mergingOpAssembler = () => {
-  const assem = exports.opAssembler();
-  const bufOp = new exports.Op();
-
-  // If we get, for example, insertions [xxx\n,yyy], those don't merge,
-  // but if we get [xxx\n,yyy,zzz\n], that merges to [xxx\nyyyzzz\n].
-  // This variable stores the length of yyy and any other newline-less
-  // ops immediately after it.
-  let bufOpAdditionalCharsAfterNewline = 0;
-
-  const flush = (isEndDocument) => {
-    if (bufOp.opcode) {
-      if (isEndDocument && bufOp.opcode === '=' && !bufOp.attribs) {
-        // final merged keep, leave it implicit
-      } else {
-        assem.append(bufOp);
-        if (bufOpAdditionalCharsAfterNewline) {
-          bufOp.chars = bufOpAdditionalCharsAfterNewline;
-          bufOp.lines = 0;
-          assem.append(bufOp);
-          bufOpAdditionalCharsAfterNewline = 0;
-        }
-      }
-      bufOp.opcode = '';
-    }
-  };
-
-  const append = (op) => {
-    if (op.chars > 0) {
-      if (bufOp.opcode === op.opcode && bufOp.attribs === op.attribs) {
-        if (op.lines > 0) {
-          // bufOp and additional chars are all mergeable into a multi-line op
-          bufOp.chars += bufOpAdditionalCharsAfterNewline + op.chars;
-          bufOp.lines += op.lines;
-          bufOpAdditionalCharsAfterNewline = 0;
-        } else if (bufOp.lines === 0) {
-          // both bufOp and op are in-line
-          bufOp.chars += op.chars;
-        } else {
-          // append in-line text to multi-line bufOp
-          bufOpAdditionalCharsAfterNewline += op.chars;
-        }
-      } else {
-        flush();
-        copyOp(op, bufOp);
-      }
-    }
-  };
-
-  const endDocument = () => {
-    flush(true);
-  };
-
-  const toString = () => {
-    flush();
-    return assem.toString();
-  };
-
-  const clear = () => {
-    assem.clear();
-    clearOp(bufOp);
-  };
-  return {
-    append,
-    toString,
-    clear,
-    endDocument,
-  };
-};
+exports.mergingOpAssembler = () => new MergingOpAssembler();
 
 /**
  * @returns {OpAssembler}
@@ -1315,7 +1304,7 @@ exports.mutateAttributionLines = (cs, lines, pool) => {
 
   const outputMutOp = (op) => {
     if (!lineAssem) {
-      lineAssem = exports.mergingOpAssembler();
+      lineAssem = new MergingOpAssembler();
     }
     lineAssem.append(op);
     if (op.lines > 0) {
@@ -1368,7 +1357,7 @@ exports.mutateAttributionLines = (cs, lines, pool) => {
  * @returns {string} joined Attribution lines
  */
 exports.joinAttributionLines = (theAlines) => {
-  const assem = exports.mergingOpAssembler();
+  const assem = new MergingOpAssembler();
   for (let i = 0; i < theAlines.length; i++) {
     const aline = theAlines[i];
     for (const op of new exports.OpIter(aline)) assem.append(op);
@@ -1377,7 +1366,7 @@ exports.joinAttributionLines = (theAlines) => {
 };
 
 exports.splitAttributionLines = (attrOps, text) => {
-  const assem = exports.mergingOpAssembler();
+  const assem = new MergingOpAssembler();
   const lines = [];
   let pos = 0;
 
