@@ -439,6 +439,62 @@ class MergingOpAssembler {
 }
 
 /**
+ * Canonicalizes a sequence of operations. Specifically:
+ *   - Skips no-op changes.
+ *   - Reorders consecutive '-' and '+' operations.
+ *   - Combines consecutive operations when possible.
+ *
+ * @param {Iterable.<Op>} ops - Iterable of operations to combine.
+ * @param {boolean} finalize - If truthy, omits the final op if it is an attributeless keep op.
+ * @yields {Op} The canonicalized operations.
+ * @returns {number} How much the sequence of operations changes the length (in characters).
+ */
+const canonicalizeOps = function* (ops, finalize) {
+  let minusOps = [];
+  let plusOps = [];
+  let keepOps = [];
+  let prevOpcode = '';
+  let lengthChange = 0;
+
+  const flushPlusMinus = function* () {
+    yield* squashOps(minusOps, false);
+    minusOps = [];
+    yield* squashOps(plusOps, false);
+    plusOps = [];
+  };
+
+  const flushKeeps = function* (finalize) {
+    yield* squashOps(keepOps, finalize);
+    keepOps = [];
+  };
+
+  for (const op of ops) {
+    if (!op.opcode || !op.chars) continue;
+    switch (op.opcode) {
+      case '-':
+        if (prevOpcode === '=') yield* flushKeeps(false);
+        minusOps.push(op);
+        lengthChange -= op.chars;
+        break;
+      case '+':
+        if (prevOpcode === '=') yield* flushKeeps(false);
+        plusOps.push(op);
+        lengthChange += op.chars;
+        break;
+      case '=':
+        if (prevOpcode !== '=') yield* flushPlusMinus();
+        keepOps.push(op);
+        break;
+    }
+    prevOpcode = op.opcode;
+  }
+
+  yield* flushPlusMinus();
+  yield* flushKeeps(finalize);
+  return lengthChange;
+};
+
+/**
  * Creates an object that allows you to append operations (type Op) and also compresses them if
  * possible. Like MergingOpAssembler, but able to produce conforming exportss from slightly looser
  * input, at the cost of speed. Specifically:
@@ -449,49 +505,19 @@ class MergingOpAssembler {
  */
 class SmartOpAssembler {
   constructor() {
-    this._minusAssem = new MergingOpAssembler();
-    this._plusAssem = new MergingOpAssembler();
-    this._keepAssem = new MergingOpAssembler();
-    this._assem = exports.stringAssembler();
-    this._lastOpcode = '';
-    this._lengthChange = 0;
+    this.clear();
   }
 
-  _flushKeeps() {
-    this._assem.append(this._keepAssem.toString());
-    this._keepAssem.clear();
-  }
-
-  _flushPlusMinus() {
-    this._assem.append(this._minusAssem.toString());
-    this._minusAssem.clear();
-    this._assem.append(this._plusAssem.toString());
-    this._plusAssem.clear();
+  _serialize(finalize) {
+    this._serialized = serializeOps((function* () {
+      this._lengthChange = yield* canonicalizeOps(this._ops, finalize);
+    }).call(this));
   }
 
   append(op) {
-    if (!op.opcode) return;
-    if (!op.chars) return;
-
-    if (op.opcode === '-') {
-      if (this._lastOpcode === '=') {
-        this._flushKeeps();
-      }
-      this._minusAssem.append(op);
-      this._lengthChange -= op.chars;
-    } else if (op.opcode === '+') {
-      if (this._lastOpcode === '=') {
-        this._flushKeeps();
-      }
-      this._plusAssem.append(op);
-      this._lengthChange += op.chars;
-    } else if (op.opcode === '=') {
-      if (this._lastOpcode !== '=') {
-        this._flushPlusMinus();
-      }
-      this._keepAssem.append(op);
-    }
-    this._lastOpcode = op.opcode;
+    this._serialized = null;
+    this._lengthChange = null;
+    this._ops.push(copyOp(op));
   }
 
   appendOpWithText(opcode, text, attribs, pool) {
@@ -513,24 +539,22 @@ class SmartOpAssembler {
   }
 
   toString() {
-    this._flushPlusMinus();
-    this._flushKeeps();
-    return this._assem.toString();
+    if (this._serialized == null) this._serialize(false);
+    return this._serialized;
   }
 
   clear() {
-    this._minusAssem.clear();
-    this._plusAssem.clear();
-    this._keepAssem.clear();
-    this._assem.clear();
-    this._lengthChange = 0;
+    this._ops = [];
+    this._serialized = null;
+    this._lengthChange = null;
   }
 
   endDocument() {
-    this._keepAssem.endDocument();
+    this._serialize(true);
   }
 
   getLengthChange() {
+    if (this._lengthChange == null) this._serialize(false);
     return this._lengthChange;
   }
 }
