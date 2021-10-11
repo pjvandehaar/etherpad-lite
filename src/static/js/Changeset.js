@@ -317,7 +317,7 @@ const copyOp = (op1, op2 = new exports.Op()) => Object.assign(op2, op1);
  */
 class OpAssembler {
   constructor() {
-    this._pieces = [];
+    this.clear();
   }
 
   /**
@@ -325,15 +325,15 @@ class OpAssembler {
    */
   append(op) {
     assert(op instanceof exports.Op, 'argument must be an instance of Op');
-    this._pieces.push(op.toString());
+    this._serialized += op.toString();
   }
 
   toString() {
-    return this._pieces.join('');
+    return this._serialized;
   }
 
   clear() {
-    this._pieces.length = 0;
+    this._serialized = '';
   }
 }
 
