@@ -209,7 +209,7 @@ PadDiff.prototype._extendChangesetWithAuthor = (changeset, author, apool) => {
   // unpack
   const unpacked = Changeset.unpack(changeset);
 
-  const assem = Changeset.opAssembler();
+  const ops = [];
 
   // create deleted attribs
   const authorAttrib = apool.putAttrib(['author', author || '']);
@@ -224,13 +224,12 @@ PadDiff.prototype._extendChangesetWithAuthor = (changeset, author, apool) => {
       // this is operator changes only attributes, let's mark which author did that
       operator.attribs += `*${Changeset.numToString(authorAttrib)}`;
     }
-
-    // append the new operator to our assembler
-    assem.append(operator);
+    ops.push(operator);
   }
 
   // return the modified changeset
-  return Changeset.pack(unpacked.oldLen, unpacked.newLen, assem.toString(), unpacked.charBank);
+  return Changeset.pack(
+      unpacked.oldLen, unpacked.newLen, Changeset.serializeOps(ops), unpacked.charBank);
 };
 
 // this method is 80% like Changeset.inverse. I just changed so instead of reverting,

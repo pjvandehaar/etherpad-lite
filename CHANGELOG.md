@@ -35,6 +35,8 @@
     * The `newOp()` function is deprecated; use the new `Op` class instead.
     * The `opIterator()` function is deprecated; use the new `OpIter` class
       instead.
+    * The `opAssembler()` function is deprecated; use the new `serializeOps()`
+      function instead.
 
 ### Notable enhancements
 
