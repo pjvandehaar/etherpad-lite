@@ -1173,7 +1173,7 @@ exports.composeAttributes = (att1, att2, resultIsMutation, pool) => {
     }
     return '';
   });
-  atts.sort();
+  atts.sort((a, b) => (a[0] > b[0]) - (a[0] < b[0]));
   const buf = exports.stringAssembler();
   for (const att of atts) {
     buf.append('*');
@@ -1884,7 +1884,7 @@ exports.makeAttribsString = (opcode, attribs, pool) => {
   } else if (pool && attribs.length) {
     if (attribs.length > 1) {
       attribs = attribs.slice();
-      attribs.sort();
+      attribs.sort((a, b) => (a[0] > b[0]) - (a[0] < b[0]));
     }
     const result = [];
     for (const pair of attribs) {
