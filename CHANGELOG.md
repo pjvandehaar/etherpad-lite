@@ -39,6 +39,8 @@
       function instead.
     * The `mergingOpAssembler()` function is deprecated; use the new
       `squashOps()` generator function with `serializeOps()` instead.
+    * The `appendATextToAssembler()` function is deprecated; use the new
+      `opsFromAText()` generator function instead.
 
 ### Notable enhancements
 
