@@ -36,10 +36,8 @@ describe('easysync', function () {
 
   it('throughSmartAssembler', async function () {
     const x = '-c*3*4+6|3=az*asdf0*1*2*3+1=1-1+1*0+1=1-1+1|c=c-1';
-    const assem = Changeset.smartOpAssembler();
-    for (const op of new Changeset.OpIter(x)) assem.append(op);
-    assem.endDocument();
-    expect(assem.toString()).to.equal(x);
+    expect(Changeset.serializeOps(Changeset.canonicalizeOps(new Changeset.OpIter(x), true)))
+        .to.equal(x);
   });
 
   const applyMutations = (mu, arrayOfArrays) => {
@@ -52,37 +50,36 @@ describe('easysync', function () {
   };
 
   const mutationsToChangeset = (oldLen, arrayOfArrays) => {
-    const assem = Changeset.smartOpAssembler();
-    const op = new Changeset.Op();
     const bank = Changeset.stringAssembler();
     let oldPos = 0;
     let newLen = 0;
-    arrayOfArrays.forEach((a) => {
-      if (a[0] === 'skip') {
-        op.opcode = '=';
-        op.chars = a[1];
-        op.lines = (a[2] || 0);
-        assem.append(op);
-        oldPos += op.chars;
-        newLen += op.chars;
-      } else if (a[0] === 'remove') {
-        op.opcode = '-';
-        op.chars = a[1];
-        op.lines = (a[2] || 0);
-        assem.append(op);
-        oldPos += op.chars;
-      } else if (a[0] === 'insert') {
-        op.opcode = '+';
-        bank.append(a[1]);
-        op.chars = a[1].length;
-        op.lines = (a[2] || 0);
-        assem.append(op);
-        newLen += op.chars;
+    const ops = (function* () {
+      for (const a of arrayOfArrays) {
+        const op = new Changeset.Op();
+        if (a[0] === 'skip') {
+          op.opcode = '=';
+          op.chars = a[1];
+          op.lines = (a[2] || 0);
+          oldPos += op.chars;
+          newLen += op.chars;
+        } else if (a[0] === 'remove') {
+          op.opcode = '-';
+          op.chars = a[1];
+          op.lines = (a[2] || 0);
+          oldPos += op.chars;
+        } else if (a[0] === 'insert') {
+          op.opcode = '+';
+          bank.append(a[1]);
+          op.chars = a[1].length;
+          op.lines = (a[2] || 0);
+          newLen += op.chars;
+        }
+        yield op;
       }
-    });
+    })();
+    const serializedOps = Changeset.serializeOps(Changeset.canonicalizeOps(ops, true));
     newLen += oldLen - oldPos;
-    assem.endDocument();
-    return Changeset.pack(oldLen, newLen, assem.toString(), bank.toString());
+    return Changeset.pack(oldLen, newLen, serializedOps, bank.toString());
   };
 
   const runMutationTest = (testId, origLines, muts, correct) => {
@@ -500,26 +497,22 @@ describe('easysync', function () {
     const charBank = Changeset.stringAssembler();
     let textLeft = origText; // always keep final newline
     const outTextAssem = Changeset.stringAssembler();
-    const opAssem = Changeset.smartOpAssembler();
+    const ops = [];
     const oldLen = origText.length;
 
-    const nextOp = new Changeset.Op();
-
     const appendMultilineOp = (opcode, txt) => {
-      nextOp.opcode = opcode;
-      if (withAttribs) {
-        nextOp.attribs = randomTwoPropAttribs(opcode);
-      }
+      const attribs = withAttribs ? randomTwoPropAttribs(opcode) : '';
       txt.replace(/\n|[^\n]+/g, (t) => {
+        const nextOp = new Changeset.Op(opcode);
+        nextOp.attribs = attribs;
         if (t === '\n') {
           nextOp.chars = 1;
           nextOp.lines = 1;
-          opAssem.append(nextOp);
         } else {
           nextOp.chars = t.length;
           nextOp.lines = 0;
-          opAssem.append(nextOp);
         }
+        ops.push(nextOp);
         return '';
       });
     };
@@ -546,8 +539,8 @@ describe('easysync', function () {
     while (textLeft.length > 1) doOp();
     for (let i = 0; i < 5; i++) doOp(); // do some more (only insertions will happen)
     const outText = `${outTextAssem.toString()}\n`;
-    opAssem.endDocument();
-    const cs = Changeset.pack(oldLen, outText.length, opAssem.toString(), charBank.toString());
+    const serializedOps = Changeset.serializeOps(Changeset.canonicalizeOps(ops, true));
+    const cs = Changeset.pack(oldLen, outText.length, serializedOps, charBank.toString());
     Changeset.checkRep(cs);
     return [cs, outText];
   };
@@ -740,9 +733,9 @@ describe('easysync', function () {
 
   const testAppendATextToAssembler = (testId, atext, correctOps) => {
     it(`testAppendATextToAssembler#${testId}`, async function () {
-      const assem = Changeset.smartOpAssembler();
-      for (const op of Changeset.opsFromAText(atext)) assem.append(op);
-      expect(assem.toString()).to.equal(correctOps);
+      const serializedOps =
+          Changeset.serializeOps(Changeset.canonicalizeOps(Changeset.opsFromAText(atext), false));
+      expect(serializedOps).to.equal(correctOps);
     });
   };
 

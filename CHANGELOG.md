@@ -41,6 +41,8 @@
       `squashOps()` generator function with `serializeOps()` instead.
     * The `appendATextToAssembler()` function is deprecated; use the new
       `opsFromAText()` generator function instead.
+    * The `smartOpAssembler()` function is deprecated; use the new
+      `canonicalizeOps()` generator function with `serializeOps()` instead.
 
 ### Notable enhancements
 
