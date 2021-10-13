@@ -526,7 +526,7 @@ exports.restoreRevision = async (padID, rev) => {
   atext.text += '\n';
 
   const eachAttribRun = (attribs, func) => {
-    const attribsIter = Changeset.opIterator(attribs);
+    const attribsIter = new Changeset.OpIter(attribs);
     let textIndex = 0;
     const newTextStart = 0;
     const newTextEnd = atext.text.length;

@@ -33,7 +33,7 @@ PadDiff.prototype._isClearAuthorship = function (changeset) {
   }
 
   // lets iterator over the operators
-  const iterator = Changeset.opIterator(unpacked.ops);
+  const iterator = new Changeset.OpIter(unpacked.ops);
 
   // get the first operator, this should be a clear operator
   const clearOperator = iterator.next();
@@ -215,7 +215,7 @@ PadDiff.prototype._extendChangesetWithAuthor = (changeset, author, apool) => {
   // unpack
   const unpacked = Changeset.unpack(changeset);
 
-  const iterator = Changeset.opIterator(unpacked.ops);
+  const iterator = new Changeset.OpIter(unpacked.ops);
   const assem = Changeset.opAssembler();
 
   // create deleted attribs
@@ -276,13 +276,13 @@ PadDiff.prototype._createDeletionChangeset = function (cs, startAText, apool) {
   const curLineNextOp = new Changeset.Op('+');
 
   const unpacked = Changeset.unpack(cs);
-  const csIter = Changeset.opIterator(unpacked.ops);
+  const csIter = new Changeset.OpIter(unpacked.ops);
   const builder = Changeset.builder(unpacked.newLen);
 
   const consumeAttribRuns = (numChars, func /* (len, attribs, endsLine)*/) => {
     if ((!curLineOpIter) || (curLineOpIterLine !== curLine)) {
       // create curLineOpIter and advance it to curChar
-      curLineOpIter = Changeset.opIterator(aLinesGet(curLine));
+      curLineOpIter = new Changeset.OpIter(aLinesGet(curLine));
       curLineOpIterLine = curLine;
       let indexIntoLine = 0;
       let done = false;
@@ -303,7 +303,7 @@ PadDiff.prototype._createDeletionChangeset = function (cs, startAText, apool) {
         curChar = 0;
         curLineOpIterLine = curLine;
         curLineNextOp.chars = 0;
-        curLineOpIter = Changeset.opIterator(aLinesGet(curLine));
+        curLineOpIter = new Changeset.OpIter(aLinesGet(curLine));
       }
 
       if (!curLineNextOp.chars) {

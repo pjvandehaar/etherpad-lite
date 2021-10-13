@@ -68,7 +68,7 @@ exports.setPadHTML = async (pad, html) => {
   const newAttribs = `${result.lineAttribs.join('|1+1')}|1+1`;
 
   const eachAttribRun = (attribs, func /* (startInNewText, endInNewText, attribs)*/) => {
-    const attribsIter = Changeset.opIterator(attribs);
+    const attribsIter = new Changeset.OpIter(attribs);
     let textIndex = 0;
     const newTextStart = 0;
     const newTextEnd = newText.length;

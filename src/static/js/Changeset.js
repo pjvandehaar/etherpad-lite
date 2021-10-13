@@ -162,61 +162,75 @@ exports.newLen = (cs) => exports.unpack(cs).newLen;
  * Iterator over a changeset's operations.
  *
  * Note: This class does NOT implement the ECMAScript iterable or iterator protocols.
- *
- * @typedef {object} OpIter
- * @property {Function} hasNext -
- * @property {Function} lastIndex -
- * @property {Function} next -
  */
+exports.OpIter = class {
+  /**
+   * @param {string} opsStr - String encoding the change operations to iterate over.
+   * @param {number} [startIndex=0] - Start position in `opsStr`.
+   */
+  constructor(opsStr, startIndex = 0) {
+    this._opsStr = opsStr;
+    this._regex = /((?:\*[0-9a-z]+)*)(?:\|([0-9a-z]+))?([-+=])([0-9a-z]+)|\?|/g;
+    this._curIndex = startIndex;
+    this._prevIndex = this._curIndex;
+    this._regexResult = this._nextRegexMatch();
+  }
 
-/**
- * Creates an iterator which decodes string changeset operations.
- *
- * @param {string} opsStr - String encoding of the change operations to perform.
- * @param {number} [optStartIndex=0] - From where in the string should the iterator start.
- * @returns {OpIter} Operator iterator object.
- */
-exports.opIterator = (opsStr, optStartIndex) => {
-  const regex = /((?:\*[0-9a-z]+)*)(?:\|([0-9a-z]+))?([-+=])([0-9a-z]+)|\?|/g;
-  const startIndex = (optStartIndex || 0);
-  let curIndex = startIndex;
-  let prevIndex = curIndex;
-
-  const nextRegexMatch = () => {
-    prevIndex = curIndex;
-    regex.lastIndex = curIndex;
-    const result = regex.exec(opsStr);
-    curIndex = regex.lastIndex;
+  _nextRegexMatch() {
+    this._prevIndex = this._curIndex;
+    this._regex.lastIndex = this._curIndex;
+    const result = this._regex.exec(this._opsStr);
+    this._curIndex = this._regex.lastIndex;
     if (result[0] === '?') {
       error('Hit error opcode in op stream');
     }
-
     return result;
-  };
-  let regexResult = nextRegexMatch();
+  }
 
-  const next = (op = new exports.Op()) => {
-    if (regexResult[0]) {
-      op.attribs = regexResult[1];
-      op.lines = exports.parseNum(regexResult[2] || 0);
-      op.opcode = regexResult[3];
-      op.chars = exports.parseNum(regexResult[4]);
-      regexResult = nextRegexMatch();
+  /**
+   * @returns {boolean} Whether there are any remaining operations.
+   */
+  hasNext() {
+    return !!(this._regexResult[0]);
+  }
+
+  /**
+   * Returns the next operation object and advances the iterator.
+   *
+   * Note: This does NOT implement the ECMAScript iterator protocol.
+   *
+   * @param {Op} [opOut] - Deprecated. Operation object to recycle for the return value.
+   * @returns {Op} The next operation, or an operation with a falsy `opcode` property if there are
+   *     no more operations.
+   */
+  next(opOut = new exports.Op()) {
+    if (this.hasNext()) {
+      opOut.attribs = this._regexResult[1];
+      opOut.lines = exports.parseNum(this._regexResult[2] || 0);
+      opOut.opcode = this._regexResult[3];
+      opOut.chars = exports.parseNum(this._regexResult[4]);
+      this._regexResult = this._nextRegexMatch();
     } else {
-      clearOp(op);
+      clearOp(opOut);
     }
-    return op;
-  };
+    return opOut;
+  }
 
-  const hasNext = () => !!(regexResult[0]);
+  lastIndex() {
+    return this._prevIndex;
+  }
+};
 
-  const lastIndex = () => prevIndex;
-
-  return {
-    next,
-    hasNext,
-    lastIndex,
-  };
+/**
+ * Creates an iterator which decodes string changeset operations.
+ * @deprecated Use the `OpIter` class instead.
+ * @param {string} opsStr - String encoding of the change operations to be performed.
+ * @param {number} optStartIndex - From where in the string should the iterator start.
+ * @returns Operator iterator object.
+ */
+exports.opIterator = (opsStr, optStartIndex) => {
+  warnDeprecated('Changeset.opIterator() is deprecated; use the Changeset.OpIter class instead');
+  return new exports.OpIter(opsStr, optStartIndex);
 };
 
 /**
@@ -312,7 +326,7 @@ exports.checkRep = (cs) => {
   let oldPos = 0;
   let calcNewLen = 0;
   let numInserted = 0;
-  const iter = exports.opIterator(ops);
+  const iter = new exports.OpIter(ops);
   while (iter.hasNext()) {
     const o = iter.next();
     switch (o.opcode) {
@@ -971,8 +985,8 @@ class TextLinesMutator {
  * @returns {string} the integrated changeset
  */
 const applyZip = (in1, in2, func) => {
-  const iter1 = exports.opIterator(in1);
-  const iter2 = exports.opIterator(in2);
+  const iter1 = new exports.OpIter(in1);
+  const iter2 = new exports.OpIter(in2);
   const assem = exports.smartOpAssembler();
   const op1 = new exports.Op();
   const op2 = new exports.Op();
@@ -1045,7 +1059,7 @@ exports.pack = (oldLen, newLen, opsStr, bank) => {
 exports.applyToText = (cs, str) => {
   const unpacked = exports.unpack(cs);
   assert(str.length === unpacked.oldLen, 'mismatched apply: ', str.length, ' / ', unpacked.oldLen);
-  const csIter = exports.opIterator(unpacked.ops);
+  const csIter = new exports.OpIter(unpacked.ops);
   const bankIter = exports.stringIterator(unpacked.charBank);
   const strIter = exports.stringIterator(str);
   const assem = exports.stringAssembler();
@@ -1090,7 +1104,7 @@ exports.applyToText = (cs, str) => {
  */
 exports.mutateTextLines = (cs, lines) => {
   const unpacked = exports.unpack(cs);
-  const csIter = exports.opIterator(unpacked.ops);
+  const csIter = new exports.OpIter(unpacked.ops);
   const bankIter = exports.stringIterator(unpacked.charBank);
   const mut = new TextLinesMutator(lines);
   while (csIter.hasNext()) {
@@ -1291,7 +1305,7 @@ exports.applyToAttribution = (cs, astr, pool) => {
 
 exports.mutateAttributionLines = (cs, lines, pool) => {
   const unpacked = exports.unpack(cs);
-  const csIter = exports.opIterator(unpacked.ops);
+  const csIter = new exports.OpIter(unpacked.ops);
   const csBank = unpacked.charBank;
   let csBankIndex = 0;
   // treat the attribution lines as text lines, mutating a line at a time
@@ -1304,7 +1318,7 @@ exports.mutateAttributionLines = (cs, lines, pool) => {
   const nextMutOp = (destOp) => {
     if ((!(lineIter && lineIter.hasNext())) && mut.hasMore()) {
       const line = mut.removeLines(1);
-      lineIter = exports.opIterator(line);
+      lineIter = new exports.OpIter(line);
     }
     if (lineIter && lineIter.hasNext()) {
       lineIter.next(destOp);
@@ -1382,7 +1396,7 @@ exports.joinAttributionLines = (theAlines) => {
   const assem = exports.mergingOpAssembler();
   for (let i = 0; i < theAlines.length; i++) {
     const aline = theAlines[i];
-    const iter = exports.opIterator(aline);
+    const iter = new exports.OpIter(aline);
     while (iter.hasNext()) {
       assem.append(iter.next());
     }
@@ -1391,7 +1405,7 @@ exports.joinAttributionLines = (theAlines) => {
 };
 
 exports.splitAttributionLines = (attrOps, text) => {
-  const iter = exports.opIterator(attrOps);
+  const iter = new exports.OpIter(attrOps);
   const assem = exports.mergingOpAssembler();
   const lines = [];
   let pos = 0;
@@ -1549,7 +1563,7 @@ const toSplices = (cs) => {
   const splices = [];
 
   let oldPos = 0;
-  const iter = exports.opIterator(unpacked.ops);
+  const iter = new exports.OpIter(unpacked.ops);
   const charIter = exports.stringIterator(unpacked.charBank);
   let inSplice = false;
   while (iter.hasNext()) {
@@ -1800,7 +1814,7 @@ exports.copyAText = (atext1, atext2) => {
  */
 exports.appendATextToAssembler = (atext, assem) => {
   // intentionally skips last newline char of atext
-  const iter = exports.opIterator(atext.attribs);
+  const iter = new exports.OpIter(atext.attribs);
   const op = new exports.Op();
   while (iter.hasNext()) {
     iter.next(op);
@@ -1974,7 +1988,7 @@ exports.makeAttribsString = (opcode, attribs, pool) => {
  * Like "substring" but on a single-line attribution string.
  */
 exports.subattribution = (astr, start, optEnd) => {
-  const iter = exports.opIterator(astr, 0);
+  const iter = new exports.OpIter(astr);
   const assem = exports.smartOpAssembler();
   const attOp = new exports.Op();
   const csOp = new exports.Op();
@@ -2053,13 +2067,13 @@ exports.inverse = (cs, lines, alines, pool) => {
   const curLineNextOp = new exports.Op('+');
 
   const unpacked = exports.unpack(cs);
-  const csIter = exports.opIterator(unpacked.ops);
+  const csIter = new exports.OpIter(unpacked.ops);
   const builder = exports.builder(unpacked.newLen);
 
   const consumeAttribRuns = (numChars, func /* (len, attribs, endsLine)*/) => {
     if ((!curLineOpIter) || (curLineOpIterLine !== curLine)) {
       // create curLineOpIter and advance it to curChar
-      curLineOpIter = exports.opIterator(alinesGet(curLine));
+      curLineOpIter = new exports.OpIter(alinesGet(curLine));
       curLineOpIterLine = curLine;
       let indexIntoLine = 0;
       let done = false;
@@ -2080,7 +2094,7 @@ exports.inverse = (cs, lines, alines, pool) => {
         curChar = 0;
         curLineOpIterLine = curLine;
         curLineNextOp.chars = 0;
-        curLineOpIter = exports.opIterator(alinesGet(curLine));
+        curLineOpIter = new exports.OpIter(alinesGet(curLine));
       }
       if (!curLineNextOp.chars) {
         curLineOpIter.next(curLineNextOp);

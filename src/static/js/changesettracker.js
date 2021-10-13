@@ -162,7 +162,7 @@ const makeChangesetTracker = (scheduler, apool, aceCallbacksProvider) => {
 
           // Replace all added 'author' attribs with the value of the current user
           const cs = Changeset.unpack(userChangeset);
-          const iterator = Changeset.opIterator(cs.ops);
+          const iterator = new Changeset.OpIter(cs.ops);
           let op;
           const assem = Changeset.mergingOpAssembler();
 

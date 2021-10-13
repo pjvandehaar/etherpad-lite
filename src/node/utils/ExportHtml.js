@@ -196,7 +196,7 @@ const getHTMLFromAtext = async (pad, atext, authorColors) => {
         return;
       }
 
-      const iter = Changeset.opIterator(Changeset.subattribution(attribs, idx, idx + numChars));
+      const iter = new Changeset.OpIter(Changeset.subattribution(attribs, idx, idx + numChars));
       idx += numChars;
 
       // this iterates over every op string and decides which tags to open or to close

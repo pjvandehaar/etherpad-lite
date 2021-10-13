@@ -23,13 +23,17 @@ This function returns an object representation of the changeset, similar to this
  * `ops` {String} the actual changes, introduced by this changeset.
  * `charBank` {String} All characters that are added by this changeset.
 
-## Changeset.opIterator(ops)
+## Changeset.OpIter class
 
- * `ops` {String} The operators, returned by `Changeset.unpack()`
+Class to facilitate iteration over operations in a changeset.
 
-Returns an operator iterator. This iterator allows us to iterate over all operators that are in the changeset.
+Methods:
 
-You can iterate with an opIterator using its `next()` and `hasNext()` methods. Next returns the `next()` operator object and `hasNext()` indicates, whether there are any operators left.
+* `constructor(ops)`: Takes a string of operations, as returned by
+  `Changeset.unpack()`.
+* `hasNext()`: Returns whether there are any remaining operations.
+* `next()`: Returns the next operation object and advances the iterator. Note:
+  This does NOT follow the ECMAScript iterator protocol.
 
 ## The Operator object
 There are 3 types of operators: `+`,`-` and `=`. These operators describe different changes to the document, beginning with the first character of the document. A `=` operator doesn't change the text, but it may add or remove text attributes. A `-` operator removes text. And a `+` Operator adds text and optionally adds some attributes to it.
@@ -109,11 +113,10 @@ Simple example of how to get the key value pair for the attribute 1
 This is an atext. An atext has two parts: text and attribs. The text is just the text of the pad as a string. We will look closer at the attribs at the next steps
 
 ```
-> var opiterator = Changeset.opIterator(atext.attribs)
-> console.log(opiterator)
-{ next: [Function: next],
-  hasNext: [Function: hasNext],
-  lastIndex: [Function: lastIndex] }
+> const opiterator = new Changeset.OpIter(atext.attribs);
+OpIter {
+  ...
+}
 > opiterator.next();
 Op { opcode: '+', chars: 9, lines: 0, attribs: '*0*1' }
 > opiterator.next();

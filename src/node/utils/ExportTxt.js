@@ -75,7 +75,7 @@ const getTXTFromAtext = (pad, atext, authorColors) => {
         return;
       }
 
-      const iter = Changeset.opIterator(Changeset.subattribution(attribs, idx, idx + numChars));
+      const iter = new Changeset.OpIter(Changeset.subattribution(attribs, idx, idx + numChars));
       idx += numChars;
 
       while (iter.hasNext()) {

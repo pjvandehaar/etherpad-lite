@@ -1607,7 +1607,7 @@ function Ace2Inner(editorInfo, cssManagers) {
 
       // Iterate over attribs on this line
 
-      const opIter = Changeset.opIterator(rep.alines[lineNum]);
+      const opIter = new Changeset.OpIter(rep.alines[lineNum]);
       let indexIntoLine = 0;
 
       while (opIter.hasNext()) {
@@ -1646,7 +1646,7 @@ function Ace2Inner(editorInfo, cssManagers) {
     const selStartLine = rep.selStart[0];
     const selEndLine = rep.selEnd[0];
     for (let n = selStartLine; n <= selEndLine; n++) {
-      const opIter = Changeset.opIterator(rep.alines[n]);
+      const opIter = new Changeset.OpIter(rep.alines[n]);
       let indexIntoLine = 0;
       let selectionStartInLine = 0;
       if (documentAttributeManager.lineHasMarker(n)) {
@@ -1785,7 +1785,7 @@ function Ace2Inner(editorInfo, cssManagers) {
       };
 
       const eachAttribRun = (attribs, func /* (startInNewText, endInNewText, attribs)*/) => {
-        const attribsIter = Changeset.opIterator(attribs);
+        const attribsIter = new Changeset.OpIter(attribs);
         let textIndex = 0;
         const newTextStart = commonStart;
         const newTextEnd = newText.length - commonEnd - (shiftFinalNewlineToBeforeNewText ? 1 : 0);
@@ -1911,7 +1911,7 @@ function Ace2Inner(editorInfo, cssManagers) {
     const attribRuns = (attribs) => {
       const lengs = [];
       const atts = [];
-      const iter = Changeset.opIterator(attribs);
+      const iter = new Changeset.OpIter(attribs);
       while (iter.hasNext()) {
         const op = iter.next();
         lengs.push(op.chars);
@@ -2657,7 +2657,7 @@ function Ace2Inner(editorInfo, cssManagers) {
           // TODO: There appears to be a race condition or so.
           const authorIds = new Set();
           if (alineAttrs) {
-            const opIter = Changeset.opIterator(alineAttrs);
+            const opIter = new Changeset.OpIter(alineAttrs);
             while (opIter.hasNext()) {
               const op = opIter.next();
               const authorId = Changeset.opAttributeValue(op, 'author', apool);

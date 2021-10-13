@@ -148,7 +148,7 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
     // get  `attributeName` attribute of first char of line
     const aline = this.rep.alines[lineNum];
     if (aline) {
-      const opIter = Changeset.opIterator(aline);
+      const opIter = new Changeset.OpIter(aline);
       if (opIter.hasNext()) {
         return Changeset.opAttributeValue(opIter.next(), attributeName, this.rep.apool) || '';
       }
@@ -165,7 +165,7 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
     const aline = this.rep.alines[lineNum];
     const attributes = [];
     if (aline) {
-      const opIter = Changeset.opIterator(aline);
+      const opIter = new Changeset.OpIter(aline);
       let op;
       if (opIter.hasNext()) {
         op = opIter.next();
@@ -236,7 +236,7 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
 
       // Iterate over attribs on this line
 
-      const opIter = Changeset.opIterator(rep.alines[lineNum]);
+      const opIter = new Changeset.OpIter(rep.alines[lineNum]);
       let indexIntoLine = 0;
 
       while (opIter.hasNext()) {
@@ -274,7 +274,7 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
       return [];
     }
     // iterate through all operations of a line
-    const opIter = Changeset.opIterator(aline);
+    const opIter = new Changeset.OpIter(aline);
 
     // we need to sum up how much characters each operations take until the wanted position
     let currentPointer = 0;

@@ -167,7 +167,7 @@ const loadBroadcastJS = (socket, sendSocketMsg, fireWhenAllScriptsAreLoaded, Bro
       // deal with someone is the author of a line and changes one character,
       // so the alines won't change
       if (lineChanged === undefined) {
-        lineChanged = Changeset.opIterator(Changeset.unpack(changeset).ops).next().lines;
+        lineChanged = new Changeset.OpIter(Changeset.unpack(changeset).ops).next().lines;
       }
 
       const goToLineNumber = (lineNumber) => {

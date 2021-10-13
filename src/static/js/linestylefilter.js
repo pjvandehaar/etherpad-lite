@@ -104,7 +104,7 @@ linestylefilter.getLineStyleFilter = (lineLength, aline, textAndClassFunc, apool
       return classes.substring(1);
     };
 
-    const attributionIter = Changeset.opIterator(aline);
+    const attributionIter = new Changeset.OpIter(aline);
     let nextOp, nextOpClasses;
 
     const goNextOp = () => {
