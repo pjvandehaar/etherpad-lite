@@ -148,10 +148,8 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
     // get  `attributeName` attribute of first char of line
     const aline = this.rep.alines[lineNum];
     if (aline) {
-      const opIter = new Changeset.OpIter(aline);
-      if (opIter.hasNext()) {
-        return Changeset.opAttributeValue(opIter.next(), attributeName, this.rep.apool) || '';
-      }
+      const [op] = new Changeset.OpIter(aline);
+      if (op != null) return Changeset.opAttributeValue(op, attributeName, this.rep.apool) || '';
     }
     return '';
   },
@@ -165,10 +163,8 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
     const aline = this.rep.alines[lineNum];
     const attributes = [];
     if (aline) {
-      const opIter = new Changeset.OpIter(aline);
-      let op;
-      if (opIter.hasNext()) {
-        op = opIter.next();
+      const [op] = new Changeset.OpIter(aline);
+      if (op != null) {
         if (!op.attribs) return [];
 
         Changeset.eachAttribNumber(op.attribs, (n) => {
@@ -234,13 +230,8 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
       const end = selEnd[1];
       let hasAttrib = true;
 
-      // Iterate over attribs on this line
-
-      const opIter = new Changeset.OpIter(rep.alines[lineNum]);
       let indexIntoLine = 0;
-
-      while (opIter.hasNext()) {
-        const op = opIter.next();
+      for (const op of new Changeset.OpIter(rep.alines[lineNum])) {
         const opStartInLine = indexIntoLine;
         const opEndInLine = opStartInLine + op.chars;
         if (!hasIt(op.attribs)) {
@@ -273,16 +264,12 @@ AttributeManager.prototype = _(AttributeManager.prototype).extend({
     if (!aline) {
       return [];
     }
-    // iterate through all operations of a line
-    const opIter = new Changeset.OpIter(aline);
 
     // we need to sum up how much characters each operations take until the wanted position
     let currentPointer = 0;
     const attributes = [];
-    let currentOperation;
 
-    while (opIter.hasNext()) {
-      currentOperation = opIter.next();
+    for (const currentOperation of new Changeset.OpIter(aline)) {
       currentPointer += currentOperation.chars;
 
       if (currentPointer > column) {

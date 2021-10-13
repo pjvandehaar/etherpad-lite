@@ -586,12 +586,7 @@ const handleUserChanges = async (socket, message) => {
       });
 
       // Validate all added 'author' attribs to be the same value as the current user
-      const iterator = new Changeset.OpIter(Changeset.unpack(changeset).ops);
-      let op;
-
-      while (iterator.hasNext()) {
-        op = iterator.next();
-
+      for (const op of new Changeset.OpIter(Changeset.unpack(changeset).ops)) {
         // + can add text with attribs
         // = can change or add attribs
         // - can have attribs, but they are discarded and don't show up in the attribs -
@@ -767,11 +762,8 @@ const _correctMarkersInPad = (atext, apool) => {
   // collect char positions of line markers (e.g. bullets) in new atext
   // that aren't at the start of a line
   const badMarkers = [];
-  const iter = new Changeset.OpIter(atext.attribs);
   let offset = 0;
-  while (iter.hasNext()) {
-    const op = iter.next();
-
+  for (const op of new Changeset.OpIter(atext.attribs)) {
     const hasMarker = _.find(
         AttributeManager.lineAttributes,
         (attribute) => Changeset.opAttributeValue(op, attribute, apool)) !== undefined;

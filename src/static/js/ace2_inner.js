@@ -1605,13 +1605,8 @@ function Ace2Inner(editorInfo, cssManagers) {
       const end = selEnd[1];
       let hasAttrib = true;
 
-      // Iterate over attribs on this line
-
-      const opIter = new Changeset.OpIter(rep.alines[lineNum]);
       let indexIntoLine = 0;
-
-      while (opIter.hasNext()) {
-        const op = opIter.next();
+      for (const op of new Changeset.OpIter(rep.alines[lineNum])) {
         const opStartInLine = indexIntoLine;
         const opEndInLine = opStartInLine + op.chars;
         if (!hasIt(op.attribs)) {
@@ -1646,7 +1641,6 @@ function Ace2Inner(editorInfo, cssManagers) {
     const selStartLine = rep.selStart[0];
     const selEndLine = rep.selEnd[0];
     for (let n = selStartLine; n <= selEndLine; n++) {
-      const opIter = new Changeset.OpIter(rep.alines[n]);
       let indexIntoLine = 0;
       let selectionStartInLine = 0;
       if (documentAttributeManager.lineHasMarker(n)) {
@@ -1659,8 +1653,7 @@ function Ace2Inner(editorInfo, cssManagers) {
       if (n === selEndLine) {
         selectionEndInLine = rep.selEnd[1];
       }
-      while (opIter.hasNext()) {
-        const op = opIter.next();
+      for (const op of new Changeset.OpIter(rep.alines[n])) {
         const opStartInLine = indexIntoLine;
         const opEndInLine = opStartInLine + op.chars;
         if (!hasIt(op.attribs)) {
@@ -1785,12 +1778,10 @@ function Ace2Inner(editorInfo, cssManagers) {
       };
 
       const eachAttribRun = (attribs, func /* (startInNewText, endInNewText, attribs)*/) => {
-        const attribsIter = new Changeset.OpIter(attribs);
         let textIndex = 0;
         const newTextStart = commonStart;
         const newTextEnd = newText.length - commonEnd - (shiftFinalNewlineToBeforeNewText ? 1 : 0);
-        while (attribsIter.hasNext()) {
-          const op = attribsIter.next();
+        for (const op of new Changeset.OpIter(attribs)) {
           const nextIndex = textIndex + op.chars;
           if (!(nextIndex <= newTextStart || textIndex >= newTextEnd)) {
             func(Math.max(newTextStart, textIndex), Math.min(newTextEnd, nextIndex), op.attribs);
@@ -1911,9 +1902,7 @@ function Ace2Inner(editorInfo, cssManagers) {
     const attribRuns = (attribs) => {
       const lengs = [];
       const atts = [];
-      const iter = new Changeset.OpIter(attribs);
-      while (iter.hasNext()) {
-        const op = iter.next();
+      for (const op of new Changeset.OpIter(attribs)) {
         lengs.push(op.chars);
         atts.push(op.attribs);
       }
@@ -2657,9 +2646,7 @@ function Ace2Inner(editorInfo, cssManagers) {
           // TODO: There appears to be a race condition or so.
           const authorIds = new Set();
           if (alineAttrs) {
-            const opIter = new Changeset.OpIter(alineAttrs);
-            while (opIter.hasNext()) {
-              const op = opIter.next();
+            for (const op of new Changeset.OpIter(alineAttrs)) {
               const authorId = Changeset.opAttributeValue(op, 'author', apool);
               if (authorId !== '') authorIds.add(authorId);
             }

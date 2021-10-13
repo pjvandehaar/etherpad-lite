@@ -526,12 +526,10 @@ exports.restoreRevision = async (padID, rev) => {
   atext.text += '\n';
 
   const eachAttribRun = (attribs, func) => {
-    const attribsIter = new Changeset.OpIter(attribs);
     let textIndex = 0;
     const newTextStart = 0;
     const newTextEnd = atext.text.length;
-    while (attribsIter.hasNext()) {
-      const op = attribsIter.next();
+    for (const op of new Changeset.OpIter(attribs)) {
       const nextIndex = textIndex + op.chars;
       if (!(nextIndex <= newTextStart || textIndex >= newTextEnd)) {
         func(Math.max(newTextStart, textIndex), Math.min(newTextEnd, nextIndex), op.attribs);

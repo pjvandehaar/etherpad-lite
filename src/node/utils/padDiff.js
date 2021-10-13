@@ -32,16 +32,10 @@ PadDiff.prototype._isClearAuthorship = function (changeset) {
     return false;
   }
 
-  // lets iterator over the operators
-  const iterator = new Changeset.OpIter(unpacked.ops);
-
-  // get the first operator, this should be a clear operator
-  const clearOperator = iterator.next();
+  const [clearOperator, anotherOp] = new Changeset.OpIter(unpacked.ops);
 
   // check if there is only one operator
-  if (iterator.hasNext() === true) {
-    return false;
-  }
+  if (anotherOp != null) return false;
 
   // check if this operator doesn't change text
   if (clearOperator.opcode !== '=') {
@@ -215,7 +209,6 @@ PadDiff.prototype._extendChangesetWithAuthor = (changeset, author, apool) => {
   // unpack
   const unpacked = Changeset.unpack(changeset);
 
-  const iterator = new Changeset.OpIter(unpacked.ops);
   const assem = Changeset.opAssembler();
 
   // create deleted attribs
@@ -223,10 +216,7 @@ PadDiff.prototype._extendChangesetWithAuthor = (changeset, author, apool) => {
   const deletedAttrib = apool.putAttrib(['removed', true]);
   const attribs = `*${Changeset.numToString(authorAttrib)}*${Changeset.numToString(deletedAttrib)}`;
 
-  // iteratore over the operators of the changeset
-  while (iterator.hasNext()) {
-    const operator = iterator.next();
-
+  for (const operator of new Changeset.OpIter(unpacked.ops)) {
     if (operator.opcode === '-') {
       // this is a delete operator, extend it with the author
       operator.attribs = attribs;
@@ -276,7 +266,6 @@ PadDiff.prototype._createDeletionChangeset = function (cs, startAText, apool) {
   let curLineNextOp = new Changeset.Op('+');
 
   const unpacked = Changeset.unpack(cs);
-  const csIter = new Changeset.OpIter(unpacked.ops);
   const builder = Changeset.builder(unpacked.newLen);
 
   const consumeAttribRuns = (numChars, func /* (len, attribs, endsLine)*/) => {
@@ -369,10 +358,7 @@ PadDiff.prototype._createDeletionChangeset = function (cs, startAText, apool) {
   const attribKeys = [];
   const attribValues = [];
 
-  // iterate over all operators of this changeset
-  while (csIter.hasNext()) {
-    const csOp = csIter.next();
-
+  for (const csOp of new Changeset.OpIter(unpacked.ops)) {
     if (csOp.opcode === '=') {
       const textBank = nextText(csOp.chars);
 

@@ -161,7 +161,7 @@ exports.newLen = (cs) => exports.unpack(cs).newLen;
 /**
  * Iterator over a changeset's operations.
  *
- * Note: This class does NOT implement the ECMAScript iterable or iterator protocols.
+ * Note: This class implements the ECMAScript iterable protocol, but NOT the iterator protocol.
  */
 exports.OpIter = class {
   /**
@@ -209,6 +209,23 @@ exports.OpIter = class {
     op.chars = exports.parseNum(this._regexResult[4]);
     this._regexResult = this._nextRegexMatch();
     return op;
+  }
+
+  /**
+   * Implements the ECMAScript iterable protocol.
+   *
+   * @returns Iterator over the operations.
+   */
+  [Symbol.iterator]() {
+    return {
+      /**
+       * Implements the ECMAScript iterator protocol.
+       */
+      next: () => {
+        const done = !this.hasNext();
+        return {done, value: done ? undefined : this.next()};
+      },
+    };
   }
 };
 
@@ -351,9 +368,7 @@ exports.checkRep = (cs) => {
   let oldPos = 0;
   let calcNewLen = 0;
   let numInserted = 0;
-  const iter = new exports.OpIter(ops);
-  while (iter.hasNext()) {
-    const o = iter.next();
+  for (const o of new exports.OpIter(ops)) {
     switch (o.opcode) {
       case '=':
         oldPos += o.chars;
@@ -1080,12 +1095,10 @@ exports.pack = (oldLen, newLen, opsStr, bank) => {
 exports.applyToText = (cs, str) => {
   const unpacked = exports.unpack(cs);
   assert(str.length === unpacked.oldLen, 'mismatched apply: ', str.length, ' / ', unpacked.oldLen);
-  const csIter = new exports.OpIter(unpacked.ops);
   const bankIter = exports.stringIterator(unpacked.charBank);
   const strIter = exports.stringIterator(str);
   const assem = exports.stringAssembler();
-  while (csIter.hasNext()) {
-    const op = csIter.next();
+  for (const op of new exports.OpIter(unpacked.ops)) {
     switch (op.opcode) {
       case '+':
       // op is + and op.lines 0: no newlines must be in op.chars
@@ -1125,11 +1138,9 @@ exports.applyToText = (cs, str) => {
  */
 exports.mutateTextLines = (cs, lines) => {
   const unpacked = exports.unpack(cs);
-  const csIter = new exports.OpIter(unpacked.ops);
   const bankIter = exports.stringIterator(unpacked.charBank);
   const mut = new TextLinesMutator(lines);
-  while (csIter.hasNext()) {
-    const op = csIter.next();
+  for (const op of new exports.OpIter(unpacked.ops)) {
     switch (op.opcode) {
       case '+':
         mut.insert(bankIter.take(op.chars), op.lines);
@@ -1404,16 +1415,12 @@ exports.joinAttributionLines = (theAlines) => {
   const assem = exports.mergingOpAssembler();
   for (let i = 0; i < theAlines.length; i++) {
     const aline = theAlines[i];
-    const iter = new exports.OpIter(aline);
-    while (iter.hasNext()) {
-      assem.append(iter.next());
-    }
+    for (const op of new exports.OpIter(aline)) assem.append(op);
   }
   return assem.toString();
 };
 
 exports.splitAttributionLines = (attrOps, text) => {
-  const iter = new exports.OpIter(attrOps);
   const assem = exports.mergingOpAssembler();
   const lines = [];
   let pos = 0;
@@ -1427,8 +1434,7 @@ exports.splitAttributionLines = (attrOps, text) => {
     pos += op.chars;
   };
 
-  while (iter.hasNext()) {
-    const op = iter.next();
+  for (const op of new exports.OpIter(attrOps)) {
     let numChars = op.chars;
     let numLines = op.lines;
     while (numLines > 1) {
@@ -1572,11 +1578,9 @@ const toSplices = (cs) => {
   const splices = [];
 
   let oldPos = 0;
-  const iter = new exports.OpIter(unpacked.ops);
   const charIter = exports.stringIterator(unpacked.charBank);
   let inSplice = false;
-  while (iter.hasNext()) {
-    const op = iter.next();
+  for (const op of new exports.OpIter(unpacked.ops)) {
     if (op.opcode === '=') {
       oldPos += op.chars;
       inSplice = false;
@@ -1823,11 +1827,10 @@ exports.copyAText = (atext1, atext2) => {
  */
 exports.appendATextToAssembler = (atext, assem) => {
   // intentionally skips last newline char of atext
-  const iter = new exports.OpIter(atext.attribs);
   let lastOp = null;
-  while (iter.hasNext()) {
+  for (const op of new exports.OpIter(atext.attribs)) {
     if (lastOp != null) assem.append(lastOp);
-    lastOp = iter.next();
+    lastOp = op;
   }
   if (lastOp == null) return;
   // exclude final newline
@@ -2059,7 +2062,6 @@ exports.inverse = (cs, lines, alines, pool) => {
   let curLineNextOp = new exports.Op('+');
 
   const unpacked = exports.unpack(cs);
-  const csIter = new exports.OpIter(unpacked.ops);
   const builder = exports.builder(unpacked.newLen);
 
   const consumeAttribRuns = (numChars, func /* (len, attribs, endsLine)*/) => {
@@ -2144,8 +2146,7 @@ exports.inverse = (cs, lines, alines, pool) => {
 
   const attribKeys = [];
   const attribValues = [];
-  while (csIter.hasNext()) {
-    const csOp = csIter.next();
+  for (const csOp of new exports.OpIter(unpacked.ops)) {
     if (csOp.opcode === '=') {
       if (csOp.attribs) {
         attribKeys.length = 0;

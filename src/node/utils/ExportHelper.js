@@ -51,9 +51,8 @@ exports._analyzeLine = (text, aline, apool) => {
   let lineMarker = 0;
   line.listLevel = 0;
   if (aline) {
-    const opIter = new Changeset.OpIter(aline);
-    if (opIter.hasNext()) {
-      const op = opIter.next();
+    const [op] = new Changeset.OpIter(aline);
+    if (op != null) {
       let listType = Changeset.opAttributeValue(op, 'list', apool);
       if (listType) {
         lineMarker = 1;
