@@ -497,6 +497,35 @@ const canonicalizeOps = function* (ops, finalize) {
 };
 
 /**
+ * Generates operations from the given text and attributes.
+ *
+ * @param {('-'|'+'|'=')} opcode - The operator to use.
+ * @param {string} text - The text to remove/add/keep.
+ * @param {(string|string[][])} attribs - The attributes to apply to the operations. See
+ *     `makeAttribsString`.
+ * @param {AttributePool} pool - See `makeAttribsString`.
+ * @yields {Op} One or two ops (depending on the presense of newlines) that cover the given text.
+ */
+const opsFromText = function* (opcode, text, attribs, pool) {
+  const op = new exports.Op(opcode);
+  op.attribs = exports.makeAttribsString(opcode, attribs, pool);
+  const lastNewlinePos = text.lastIndexOf('\n');
+  if (lastNewlinePos < 0) {
+    op.chars = text.length;
+    op.lines = 0;
+    yield op;
+  } else {
+    op.chars = lastNewlinePos + 1;
+    op.lines = text.match(/\n/g).length;
+    yield op;
+    const op2 = copyOp(op);
+    op2.chars = text.length - (lastNewlinePos + 1);
+    op2.lines = 0;
+    yield op2;
+  }
+};
+
+/**
  * Creates an object that allows you to append operations (type Op) and also compresses them if
  * possible. Like MergingOpAssembler, but able to produce conforming exportss from slightly looser
  * input, at the cost of speed. Specifically:
@@ -522,22 +551,13 @@ class SmartOpAssembler {
     this._ops.push(copyOp(op));
   }
 
+  /**
+   * @deprecated Use `opsFromText` instead.
+   */
   appendOpWithText(opcode, text, attribs, pool) {
-    const op = new exports.Op(opcode);
-    op.attribs = exports.makeAttribsString(opcode, attribs, pool);
-    const lastNewlinePos = text.lastIndexOf('\n');
-    if (lastNewlinePos < 0) {
-      op.chars = text.length;
-      op.lines = 0;
-      this.append(op);
-    } else {
-      op.chars = lastNewlinePos + 1;
-      op.lines = text.match(/\n/g).length;
-      this.append(op);
-      op.chars = text.length - (lastNewlinePos + 1);
-      op.lines = 0;
-      this.append(op);
-    }
+    warnDeprecated('Changeset.SmartOpAssembler.prototype.appendOpWithText() is deprecated; ' +
+                   'use Changeset.opsFromText() instead.');
+    for (const op of opsFromText(opcode, text, attribs, pool)) this.append(op);
   }
 
   toString() {
@@ -1527,9 +1547,12 @@ exports.makeSplice = (oldFullText, spliceStart, numRemoved, newText, optNewTextA
   const newLen = oldLen + newText.length - oldText.length;
 
   const assem = new SmartOpAssembler();
-  assem.appendOpWithText('=', oldFullText.substring(0, spliceStart));
-  assem.appendOpWithText('-', oldText);
-  assem.appendOpWithText('+', newText, optNewTextAPairs, pool);
+  const ops = (function* () {
+    yield* opsFromText('=', oldFullText.substring(0, spliceStart));
+    yield* opsFromText('-', oldText);
+    yield* opsFromText('+', newText, optNewTextAPairs, pool);
+  })();
+  for (const op of ops) assem.append(op);
   assem.endDocument();
   return exports.pack(oldLen, newLen, assem.toString(), newText);
 };
@@ -1662,7 +1685,7 @@ exports.moveOpsToNewPool = (cs, oldPool, newPool) => {
  */
 exports.makeAttribution = (text) => {
   const assem = new SmartOpAssembler();
-  assem.appendOpWithText('+', text);
+  for (const op of opsFromText('+', text)) assem.append(op);
   return assem.toString();
 };
 
@@ -1902,11 +1925,11 @@ exports.builder = (oldLen) => {
       return self;
     },
     keepText: (text, attribs, pool) => {
-      assem.appendOpWithText('=', text, attribs, pool);
+      for (const op of opsFromText('=', text, attribs, pool)) assem.append(op);
       return self;
     },
     insert: (text, attribs, pool) => {
-      assem.appendOpWithText('+', text, attribs, pool);
+      for (const op of opsFromText('+', text, attribs, pool)) assem.append(op);
       charBank.append(text);
       return self;
     },
