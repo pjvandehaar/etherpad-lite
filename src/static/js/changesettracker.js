@@ -162,7 +162,7 @@ const makeChangesetTracker = (scheduler, apool, aceCallbacksProvider) => {
 
           // Replace all added 'author' attribs with the value of the current user
           const cs = Changeset.unpack(userChangeset);
-          const assem = Changeset.mergingOpAssembler();
+          const ops = [];
 
           for (const op of new Changeset.OpIter(cs.ops)) {
             if (op.opcode === '+') {
@@ -179,10 +179,10 @@ const makeChangesetTracker = (scheduler, apool, aceCallbacksProvider) => {
               });
               op.attribs = newAttrs;
             }
-            assem.append(op);
+            ops.push(op);
           }
-          assem.endDocument();
-          userChangeset = Changeset.pack(cs.oldLen, cs.newLen, assem.toString(), cs.charBank);
+          const serializedOps = Changeset.serializeOps(Changeset.squashOps(ops, true));
+          userChangeset = Changeset.pack(cs.oldLen, cs.newLen, serializedOps, cs.charBank);
           Changeset.checkRep(userChangeset);
         }
         if (Changeset.isIdentity(userChangeset)) toSubmit = null;

@@ -646,16 +646,16 @@ describe('easysync', function () {
 
   const testSplitJoinAttributionLines = (randomSeed) => {
     const stringToOps = (str) => {
-      const assem = Changeset.mergingOpAssembler();
-      const o = new Changeset.Op('+');
-      o.chars = 1;
+      const ops = [];
       for (let i = 0; i < str.length; i++) {
         const c = str.charAt(i);
+        const o = new Changeset.Op('+');
+        o.chars = 1;
         o.lines = (c === '\n' ? 1 : 0);
         o.attribs = (c === 'a' || c === 'b' ? `*${c}` : '');
-        assem.append(o);
+        ops.push(o);
       }
-      return assem.toString();
+      return Changeset.serializeOps(Changeset.squashOps(ops, false));
     };
 
     it(`testSplitJoinAttributionLines#${randomSeed}`, async function () {
