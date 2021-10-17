@@ -413,15 +413,94 @@ class MergingOpAssembler {
  *   - strips final "="
  *   - ignores 0-length changes
  *   - reorders consecutive + and - (which MergingOpAssembler doesn't do)
- *
- * @typedef {object} SmartOpAssembler
- * @property {Function} append -
- * @property {Function} appendOpWithText -
- * @property {Function} clear -
- * @property {Function} endDocument -
- * @property {Function} getLengthChange -
- * @property {Function} toString -
  */
+class SmartOpAssembler {
+  constructor() {
+    this._minusAssem = new MergingOpAssembler();
+    this._plusAssem = new MergingOpAssembler();
+    this._keepAssem = new MergingOpAssembler();
+    this._assem = exports.stringAssembler();
+    this._lastOpcode = '';
+    this._lengthChange = 0;
+  }
+
+  _flushKeeps() {
+    this._assem.append(this._keepAssem.toString());
+    this._keepAssem.clear();
+  }
+
+  _flushPlusMinus() {
+    this._assem.append(this._minusAssem.toString());
+    this._minusAssem.clear();
+    this._assem.append(this._plusAssem.toString());
+    this._plusAssem.clear();
+  }
+
+  append(op) {
+    if (!op.opcode) return;
+    if (!op.chars) return;
+
+    if (op.opcode === '-') {
+      if (this._lastOpcode === '=') {
+        this._flushKeeps();
+      }
+      this._minusAssem.append(op);
+      this._lengthChange -= op.chars;
+    } else if (op.opcode === '+') {
+      if (this._lastOpcode === '=') {
+        this._flushKeeps();
+      }
+      this._plusAssem.append(op);
+      this._lengthChange += op.chars;
+    } else if (op.opcode === '=') {
+      if (this._lastOpcode !== '=') {
+        this._flushPlusMinus();
+      }
+      this._keepAssem.append(op);
+    }
+    this._lastOpcode = op.opcode;
+  }
+
+  appendOpWithText(opcode, text, attribs, pool) {
+    const op = new exports.Op(opcode);
+    op.attribs = exports.makeAttribsString(opcode, attribs, pool);
+    const lastNewlinePos = text.lastIndexOf('\n');
+    if (lastNewlinePos < 0) {
+      op.chars = text.length;
+      op.lines = 0;
+      this.append(op);
+    } else {
+      op.chars = lastNewlinePos + 1;
+      op.lines = text.match(/\n/g).length;
+      this.append(op);
+      op.chars = text.length - (lastNewlinePos + 1);
+      op.lines = 0;
+      this.append(op);
+    }
+  }
+
+  toString() {
+    this._flushPlusMinus();
+    this._flushKeeps();
+    return this._assem.toString();
+  }
+
+  clear() {
+    this._minusAssem.clear();
+    this._plusAssem.clear();
+    this._keepAssem.clear();
+    this._assem.clear();
+    this._lengthChange = 0;
+  }
+
+  endDocument() {
+    this._keepAssem.endDocument();
+  }
+
+  getLengthChange() {
+    return this._lengthChange;
+  }
+}
 
 /**
  * Used to check if a Changeset is valid. This function does not check things that require access to
@@ -437,7 +516,7 @@ exports.checkRep = (cs) => {
   const ops = unpacked.ops;
   let charBank = unpacked.charBank;
 
-  const assem = exports.smartOpAssembler();
+  const assem = new SmartOpAssembler();
   let oldPos = 0;
   let calcNewLen = 0;
   let numInserted = 0;
@@ -478,98 +557,7 @@ exports.checkRep = (cs) => {
 /**
  * @returns {SmartOpAssembler}
  */
-exports.smartOpAssembler = () => {
-  const minusAssem = new MergingOpAssembler();
-  const plusAssem = new MergingOpAssembler();
-  const keepAssem = new MergingOpAssembler();
-  const assem = exports.stringAssembler();
-  let lastOpcode = '';
-  let lengthChange = 0;
-
-  const flushKeeps = () => {
-    assem.append(keepAssem.toString());
-    keepAssem.clear();
-  };
-
-  const flushPlusMinus = () => {
-    assem.append(minusAssem.toString());
-    minusAssem.clear();
-    assem.append(plusAssem.toString());
-    plusAssem.clear();
-  };
-
-  const append = (op) => {
-    if (!op.opcode) return;
-    if (!op.chars) return;
-
-    if (op.opcode === '-') {
-      if (lastOpcode === '=') {
-        flushKeeps();
-      }
-      minusAssem.append(op);
-      lengthChange -= op.chars;
-    } else if (op.opcode === '+') {
-      if (lastOpcode === '=') {
-        flushKeeps();
-      }
-      plusAssem.append(op);
-      lengthChange += op.chars;
-    } else if (op.opcode === '=') {
-      if (lastOpcode !== '=') {
-        flushPlusMinus();
-      }
-      keepAssem.append(op);
-    }
-    lastOpcode = op.opcode;
-  };
-
-  const appendOpWithText = (opcode, text, attribs, pool) => {
-    const op = new exports.Op(opcode);
-    op.attribs = exports.makeAttribsString(opcode, attribs, pool);
-    const lastNewlinePos = text.lastIndexOf('\n');
-    if (lastNewlinePos < 0) {
-      op.chars = text.length;
-      op.lines = 0;
-      append(op);
-    } else {
-      op.chars = lastNewlinePos + 1;
-      op.lines = text.match(/\n/g).length;
-      append(op);
-      op.chars = text.length - (lastNewlinePos + 1);
-      op.lines = 0;
-      append(op);
-    }
-  };
-
-  const toString = () => {
-    flushPlusMinus();
-    flushKeeps();
-    return assem.toString();
-  };
-
-  const clear = () => {
-    minusAssem.clear();
-    plusAssem.clear();
-    keepAssem.clear();
-    assem.clear();
-    lengthChange = 0;
-  };
-
-  const endDocument = () => {
-    keepAssem.endDocument();
-  };
-
-  const getLengthChange = () => lengthChange;
-
-  return {
-    append,
-    toString,
-    clear,
-    endDocument,
-    appendOpWithText,
-    getLengthChange,
-  };
-};
+exports.smartOpAssembler = () => new SmartOpAssembler();
 
 /**
  * @returns {MergingOpAssembler}
@@ -1011,7 +999,7 @@ class TextLinesMutator {
 const applyZip = (in1, in2, func) => {
   const iter1 = new exports.OpIter(in1);
   const iter2 = new exports.OpIter(in2);
-  const assem = exports.smartOpAssembler();
+  const assem = new SmartOpAssembler();
   let op1 = new exports.Op();
   let op2 = new exports.Op();
   while (op1.opcode || iter1.hasNext() || op2.opcode || iter2.hasNext()) {
@@ -1503,7 +1491,7 @@ exports.makeSplice = (oldFullText, spliceStart, numRemoved, newText, optNewTextA
   const oldText = oldFullText.substring(spliceStart, spliceStart + numRemoved);
   const newLen = oldLen + newText.length - oldText.length;
 
-  const assem = exports.smartOpAssembler();
+  const assem = new SmartOpAssembler();
   assem.appendOpWithText('=', oldFullText.substring(0, spliceStart));
   assem.appendOpWithText('-', oldText);
   assem.appendOpWithText('+', newText, optNewTextAPairs, pool);
@@ -1640,7 +1628,7 @@ exports.moveOpsToNewPool = (cs, oldPool, newPool) => {
  * @returns {string}
  */
 exports.makeAttribution = (text) => {
-  const assem = exports.smartOpAssembler();
+  const assem = new SmartOpAssembler();
   assem.appendOpWithText('+', text);
   return assem.toString();
 };
@@ -1867,7 +1855,7 @@ exports.attribsAttributeValue = (attribs, key, pool) => {
  * @returns {Builder}
  */
 exports.builder = (oldLen) => {
-  const assem = exports.smartOpAssembler();
+  const assem = new SmartOpAssembler();
   const o = new exports.Op();
   const charBank = exports.stringAssembler();
 
@@ -1938,7 +1926,7 @@ exports.makeAttribsString = (opcode, attribs, pool) => {
  */
 exports.subattribution = (astr, start, optEnd) => {
   const iter = new exports.OpIter(astr);
-  const assem = exports.smartOpAssembler();
+  const assem = new SmartOpAssembler();
   let attOp = new exports.Op();
   const csOp = new exports.Op();
 
