@@ -726,22 +726,14 @@ exports.stringIterator = (str) => {
 /**
  * @returns {StringAssembler}
  */
-exports.stringAssembler = () => {
-  const pieces = [];
-
+exports.stringAssembler = () => ({
+  _str: '',
   /**
    * @param {string} x -
    */
-  const append = (x) => {
-    pieces.push(String(x));
-  };
-
-  const toString = () => pieces.join('');
-  return {
-    append,
-    toString,
-  };
-};
+  append(x) { this._str += String(x); },
+  toString() { return this._str; },
+});
 
 /**
  * Class to iterate and modify texts which have several lines. It is used for applying Changesets on
