@@ -66,7 +66,7 @@ const getTXTFromAtext = (pad, atext, authorColors) => {
     // becomes
     // <b>Just bold <i>Bold and italics</i></b> <i>Just italics</i>
     const taker = Changeset.stringIterator(text);
-    const assem = Changeset.stringAssembler();
+    let assem = '';
 
     let idx = 0;
 
@@ -160,7 +160,7 @@ const getTXTFromAtext = (pad, atext, authorColors) => {
         // plugins from being able to display * at the beginning of a line
         // s = s.replace("*", ""); // Then remove it
 
-        assem.append(s);
+        assem += s;
       } // end iteration over spans in line
 
       const tags2close = [];
@@ -174,7 +174,7 @@ const getTXTFromAtext = (pad, atext, authorColors) => {
     // end processNextChars
 
     processNextChars(text.length - idx);
-    return (assem.toString());
+    return assem;
   };
   // end getLineHTML
 
