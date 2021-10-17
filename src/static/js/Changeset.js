@@ -1905,72 +1905,68 @@ exports.attribsAttributeValue = (attribs, key, pool) => {
 
 /**
  * Incrementally builds a Changeset.
- *
- * @typedef {object} Builder
- * @property {Function} insert -
- * @property {Function} keep -
- * @property {Function} keepText -
- * @property {Function} remove -
- * @property {Function} toString -
  */
+exports.Builder = class {
+  /**
+   * @param {number} oldLen - Old length
+   */
+  constructor(oldLen) {
+    this._oldLen = oldLen;
+    this._ops = [];
+    this._charBank = exports.stringAssembler();
+  }
+
+  /**
+   * @param attribs - Either [[key1,value1],[key2,value2],...] or '*0*1...' (no pool needed in
+   *     latter case).
+   */
+  keep(N, L, attribs, pool) {
+    const o = new exports.Op('=');
+    o.attribs = (attribs && exports.makeAttribsString('=', attribs, pool)) || '';
+    o.chars = N;
+    o.lines = (L || 0);
+    this._ops.push(o);
+    return this;
+  }
+
+  keepText(text, attribs, pool) {
+    this._ops.push(...opsFromText('=', text, attribs, pool));
+    return this;
+  }
+
+  insert(text, attribs, pool) {
+    this._ops.push(...opsFromText('+', text, attribs, pool));
+    this._charBank.append(text);
+    return this;
+  }
+
+  remove(N, L) {
+    const o = new exports.Op('-');
+    o.attribs = '';
+    o.chars = N;
+    o.lines = (L || 0);
+    this._ops.push(o);
+    return this;
+  }
+
+  toString() {
+    let lengthChange;
+    const serializedOps = exports.serializeOps((function* () {
+      lengthChange = yield* exports.canonicalizeOps(this._ops, true);
+    }).call(this));
+    const newLen = this._oldLen + lengthChange;
+    return exports.pack(this._oldLen, newLen, serializedOps, this._charBank.toString());
+  }
+};
 
 /**
+ * @deprecated Use the `Builder` class instead.
  * @param {number} oldLen - Old length
  * @returns {Builder}
  */
 exports.builder = (oldLen) => {
-  const ops = [];
-  let packed = null;
-  const charBank = exports.stringAssembler();
-
-  const self = {
-    /**
-     * @param attribs - Either [[key1,value1],[key2,value2],...] or '*0*1...' (no pool needed in
-     *     latter case).
-     */
-    keep: (N, L, attribs, pool) => {
-      const o = new exports.Op('=');
-      o.attribs = (attribs && exports.makeAttribsString('=', attribs, pool)) || '';
-      o.chars = N;
-      o.lines = (L || 0);
-      packed = null;
-      ops.push(o);
-      return self;
-    },
-    keepText: (text, attribs, pool) => {
-      packed = null;
-      ops.push(...opsFromText('=', text, attribs, pool));
-      return self;
-    },
-    insert: (text, attribs, pool) => {
-      packed = null;
-      ops.push(...opsFromText('+', text, attribs, pool));
-      charBank.append(text);
-      return self;
-    },
-    remove: (N, L) => {
-      const o = new exports.Op('-');
-      o.attribs = '';
-      o.chars = N;
-      o.lines = (L || 0);
-      packed = null;
-      ops.push(o);
-      return self;
-    },
-    toString: () => {
-      if (packed == null) {
-        let lengthChange;
-        const serializedOps = exports.serializeOps((function* () {
-          lengthChange = yield* exports.canonicalizeOps(ops, true);
-        })());
-        const newLen = oldLen + lengthChange;
-        packed = exports.pack(oldLen, newLen, serializedOps, charBank.toString());
-      }
-      return packed;
-    },
-  };
-
-  return self;
+  warnDeprecated('Changeset.builder() is deprecated; use the Changeset.Builder class instead');
+  return new exports.Builder(oldLen);
 };
 
 exports.makeAttribsString = (opcode, attribs, pool) => {
@@ -2062,7 +2058,7 @@ exports.inverse = (cs, lines, alines, pool) => {
   let curLineNextOp = new exports.Op('+');
 
   const unpacked = exports.unpack(cs);
-  const builder = exports.builder(unpacked.newLen);
+  const builder = new exports.Builder(unpacked.newLen);
 
   const consumeAttribRuns = (numChars, func /* (len, attribs, endsLine)*/) => {
     if ((!curLineOpIter) || (curLineOpIterLine !== curLine)) {

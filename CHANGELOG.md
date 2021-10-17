@@ -32,6 +32,8 @@
       [citizenos/ep_image_upload#49](https://github.com/citizenos/ep_image_upload/pull/49)
       for an example fix.
   * Changes to the `src/static/js/Changeset.js` library:
+    * The `builder()` function is deprecated; use the new `Builder` class
+      instead.
     * The `newOp()` function is deprecated; use the new `Op` class instead.
     * The `opIterator()` function is deprecated; use the new `OpIter` class
       instead.

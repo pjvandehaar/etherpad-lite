@@ -81,7 +81,7 @@ exports.setPadHTML = async (pad, html) => {
   };
 
   // create a new changeset with a helper builder object
-  const builder = Changeset.builder(1);
+  const builder = new Changeset.Builder(1);
 
   // assemble each line into the builder
   eachAttribRun(newAttribs, (start, end, attribs) => {
