@@ -1,113 +1,12 @@
 'use strict';
 
-/**
- * A custom made StringBuffer
- *
- * @typedef {object} StringBuffer
- * @property {Function} append
- * @property {Function} toString
- */
-/**
- * A custom made String Iterator
- *
- * @typedef {object} StringIterator
- * @property {Function} take
- * @property {Function} peek
- * @property {Function} skip
- * @property {Function} remaining
- * @property {Function} newlines
- */
-/**
- * creates an object that allows you to append operations (type Op) and also
- * compresses them if possible
- *
- * @typedef {object} SmartAssembler
- * @property {Function} append
- * @property {Function} toString
- * @property {Function} clear
- * @property {Function} endDocument
- * @property {Function} appendOpWithText
- * @property {Function} getLengthChange
- */
-
-/**
- * This class allows to iterate and modify texts which have several lines
- * It is used for applying Changesets on arrays of lines
- * Note from prev docs: "lines" need not be an array as long as it supports
- * certain calls (lines_foo inside).
- *
- * @typedef {object} TextMutator
- * @property {Function} skip 
- * @property {Function} remove
- * @property {Function} insert
- * @property {Function} close
- * @property {Function} hasMore
- * @property {Function} removeLines
- * @property {Function} skipLines
- */
-
-/**
- * @typedef {object} ChangesetBuilder
- * @property {Function} keep
- * @property {Function} keepText
- * @property {Function} insert
- * @property {Function} remove
- * @property {Function} toString
-*/
-/**
- * @typedef {object} OpIterator
- * @property {Function} next
- * @property {Function} hasNext
- * @property {Function} lastIndex
- */
-/**
- * @typedef Opcode
- * @type {object}
- * @property {('+'|'-'|'='|'')} opcode
- * @property {number} chars
- * @property {number} lines
- * @property {string} attribs
- */
-
-/**
- * @typedef OpcodeIterator
- * @type {object}
- * @property {Function} hasNext
- * @property {Function} next
- */
-
-/**
- * @typedef AText
- * @type {object}
- * @property {string} attribs
- * @property {string} text
- */
-
-/**
- * @typedef Changeset
- * @type {object}
- * @property {number} oldLen
- * @property {number} newLen
- * @property {string} ops
- * @property {string} charBank
- */
-
-/**
- * @typedef AttribPool
- * @type {object}
- * @property {Function} getAttrib
- * @property {Function} putAttrib
- * @property {Function} getAttribKey
- * @property {Function} getAttribValue
- */
-
 /*
  * This is the Changeset library copied from the old Etherpad with some modifications
  * to use it in node.js
  * Can be found in https://github.com/ether/pad/blob/master/infrastructure/ace/www/easysync2.js
  */
 
-/**
+/*
  * This code is mostly from the old Etherpad. Please help us to comment this code.
  * This helps other people to understand this code better and helps them to improve it.
  * TL;DR COMMENTS ON THIS FILE ARE HIGHLY APPRECIATED
@@ -132,13 +31,9 @@
 const AttributePool = require('./AttributePool');
 
 /**
- * ==================== General Util Functions =======================
- */
-
-/**
- * This method is called whenever there is an error in the sync process
+ * This method is called whenever there is an error in the sync process.
  *
- * @param {string} msg Just some message
+ * @param {string} msg - Just some message
  */
 exports.error = (msg) => {
   const e = new Error(msg);
@@ -147,11 +42,11 @@ exports.error = (msg) => {
 };
 
 /**
- * This method is used for assertions with Messages
- * if assert fails, the error function is called.
+ * Assert that a condition is truthy. If the condition is falsy, the `error` function is called to
+ * throw an exception.
  *
- * @param {boolean} b assertion condition
- * @param {string[]} msgParts error to be passed if it fails
+ * @param {boolean} b - assertion condition
+ * @param {...string} msgParts - error message to include in the exception
  */
 exports.assert = (b, ...msgParts) => {
   if (!b) {
@@ -160,48 +55,80 @@ exports.assert = (b, ...msgParts) => {
 };
 
 /**
- * Parses a number from string base 36
+ * Parses a number from string base 36.
  *
- * @param {string} str string of the number in base 36
+ * @param {string} str - string of the number in base 36
  * @returns {number} number
  */
 exports.parseNum = (str) => parseInt(str, 36);
 
 /**
- * Writes a number in base 36 and puts it in a string
+ * Writes a number in base 36 and puts it in a string.
  *
- * @param {number} num number
+ * @param {number} num - number
  * @returns {string} string
  */
 exports.numToString = (num) => num.toString(36).toLowerCase();
 
 /**
- * ==================== Changeset Functions =======================
+ * An operation to apply to a shared document.
+ *
+ * @typedef {object} Op
+ * @property {('+'|'-'|'='|'')} opcode - The operation's operator: '=' (keep), '+' (insert), or '-'
+ *     (delete). This may also be '' to create a null (invalid) operation, which is sometimes used
+ *     to indicate the lack of an operation.
+ * @property {number} chars - The number of characters to keep, insert, or delete.
+ * @property {number} lines - The number of characters among the `chars` characters that are
+ *     newlines.
+ * @property {string} attribs - Stores the attributes that apply to the characters ('+' and '-' ops
+ *     only). Represented as a repeated sequence of '*I' where I is a base-36 integer identifying
+ *     the attribute in the attribute pool.
  */
 
 /**
- * returns the required length of the text before changeset
- * can be applied
+ * Describes changes to apply to a document. Does not include the attribute pool or the original
+ * document.
  *
- * @param {string} cs String representation of the Changeset
+ * @typedef {object} Changeset
+ * @property {number} oldLen -
+ * @property {number} newLen -
+ * @property {string} ops -
+ * @property {string} charBank -
+ */
+
+/**
+ * Returns the required length of the text before changeset can be applied.
+ *
+ * @param {string} cs - String representation of the Changeset
  * @returns {number} oldLen property
  */
 exports.oldLen = (cs) => exports.unpack(cs).oldLen;
 
 /**
- * returns the length of the text after changeset is applied
+ * Returns the length of the text after changeset is applied.
  *
- * @param {string} cs String representation of the Changeset
+ * @param {string} cs - String representation of the Changeset
  * @returns {number} newLen property
  */
 exports.newLen = (cs) => exports.unpack(cs).newLen;
 
 /**
- * this function creates an iterator which decodes string changeset operations
+ * Iterator over a changeset's operations.
  *
- * @param {string} opsStr String encoding of the change operations to be performed
- * @param {number} [optStartIndex=0] from where in the string should the iterator start
- * @returns {OpIterator} type object iterator
+ * Note: This class does NOT implement the ECMAScript iterable or iterator protocols.
+ *
+ * @typedef {object} OpIter
+ * @property {Function} hasNext -
+ * @property {Function} lastIndex -
+ * @property {Function} next -
+ */
+
+/**
+ * Creates an iterator which decodes string changeset operations.
+ *
+ * @param {string} opsStr - String encoding of the change operations to perform.
+ * @param {number} [optStartIndex=0] - From where in the string should the iterator start.
+ * @returns {OpIter} Operator iterator object.
  */
 exports.opIterator = (opsStr, optStartIndex) => {
   const regex = /((?:\*[0-9a-z]+)*)(?:\|([0-9a-z]+))?([-+=])([0-9a-z]+)|\?|/g;
@@ -248,9 +175,9 @@ exports.opIterator = (opsStr, optStartIndex) => {
 };
 
 /**
- * Cleans an Op object
+ * Cleans an Op object.
  *
- * @param {Opcode} op to be cleared
+ * @param {Op} op - object to clear
  */
 exports.clearOp = (op) => {
   op.opcode = '';
@@ -262,8 +189,8 @@ exports.clearOp = (op) => {
 /**
  * Creates a new Op object
  *
- * @param {('+'|'-'|'='|'')} [optOpcode='']
- * @returns {Opcode}
+ * @param {('+'|'-'|'='|'')} [optOpcode=''] - The operation's operator.
+ * @returns {Op}
  */
 exports.newOp = (optOpcode) => ({
   opcode: (optOpcode || ''),
@@ -273,23 +200,10 @@ exports.newOp = (optOpcode) => ({
 });
 
 /**
- * Clones an Op
- *
- * @param {Opcode} op Op to be cloned
- * @returns {Opcode} a cloned Op
- */
-exports.cloneOp = (op) => ({
-  opcode: op.opcode,
-  chars: op.chars,
-  lines: op.lines,
-  attribs: op.attribs,
-});
-
-/**
  * Copies op1 to op2
  *
- * @param {Opcode} op1 src Op
- * @param {Opcode} op2 dest Op
+ * @param {Op} op1 - src Op
+ * @param {Op} op2 - dest Op
  */
 exports.copyOp = (op1, op2) => {
   op2.opcode = op1.opcode;
@@ -299,14 +213,51 @@ exports.copyOp = (op1, op2) => {
 };
 
 /**
- * Used to check if a Changeset if valid
+ * Serializes a sequence of Ops.
  *
- * @param {string} cs Changeset to be checked
+ * @typedef {object} OpAssembler
+ * @property {Function} append -
+ * @property {Function} clear -
+ * @property {Function} toString -
+ */
+
+/**
+ * Efficiently merges consecutive operations that are mergeable, ignores no-ops, and drops final
+ * pure "keeps". It does not re-order operations.
+ *
+ * @typedef {object} MergingOpAssembler
+ * @property {Function} append -
+ * @property {Function} clear -
+ * @property {Function} endDocument -
+ * @property {Function} toString -
+ */
+
+/**
+ * Creates an object that allows you to append operations (type Op) and also compresses them if
+ * possible. Like MergingOpAssembler, but able to produce conforming exportss from slightly looser
+ * input, at the cost of speed. Specifically:
+ *   - merges consecutive operations that can be merged
+ *   - strips final "="
+ *   - ignores 0-length changes
+ *   - reorders consecutive + and - (which MergingOpAssembler doesn't do)
+ *
+ * @typedef {object} SmartOpAssembler
+ * @property {Function} append -
+ * @property {Function} appendOpWithText -
+ * @property {Function} clear -
+ * @property {Function} endDocument -
+ * @property {Function} getLengthChange -
+ * @property {Function} toString -
+ */
+
+/**
+ * Used to check if a Changeset is valid. This function does not check things that require access to
+ * the attribute pool (e.g., attribute order) or original text (e.g., newline positions).
+ *
+ * @param {string} cs - Changeset to check
  * @returns {string} the checked Changeset
  */
 exports.checkRep = (cs) => {
-  // doesn't check things that require access to attrib pool (e.g. attribute order)
-  // or original string (e.g. newline positions)
   const unpacked = exports.unpack(cs);
   const oldLen = unpacked.oldLen;
   const newLen = unpacked.newLen;
@@ -353,23 +304,10 @@ exports.checkRep = (cs) => {
   return cs;
 };
 
-
 /**
- * ==================== Util Functions =======================
- */
-
-/**
- *
- * @returns {SmartAssembler}
+ * @returns {SmartOpAssembler}
  */
 exports.smartOpAssembler = () => {
-  // Like opAssembler but able to produce conforming exportss
-  // from slightly looser input, at the cost of speed.
-  // Specifically:
-  // - merges consecutive operations that can be merged
-  // - strips final "="
-  // - ignores 0-length changes
-  // - reorders consecutive + and - (which margingOpAssembler doesn't do)
   const minusAssem = exports.mergingOpAssembler();
   const plusAssem = exports.mergingOpAssembler();
   const keepAssem = exports.mergingOpAssembler();
@@ -462,12 +400,10 @@ exports.smartOpAssembler = () => {
   };
 };
 
-
+/**
+ * @returns {MergingOpAssembler}
+ */
 exports.mergingOpAssembler = () => {
-  // This assembler can be used in production; it efficiently
-  // merges consecutive operations that are mergeable, ignores
-  // no-ops, and drops final pure "keeps".  It does not re-order
-  // operations.
   const assem = exports.opAssembler();
   const bufOp = exports.newOp();
 
@@ -537,11 +473,15 @@ exports.mergingOpAssembler = () => {
   };
 };
 
-
+/**
+ * @returns {OpAssembler}
+ */
 exports.opAssembler = () => {
   const pieces = [];
-  // this function allows op to be mutated later (doesn't keep a ref)
 
+  /**
+   * @param {Op} op - Operation to add. Ownership remains with the caller.
+   */
   const append = (op) => {
     pieces.push(op.attribs);
     if (op.lines) {
@@ -564,7 +504,18 @@ exports.opAssembler = () => {
 };
 
 /**
- * @param {string} str String to be iterated over
+ * A custom made String Iterator
+ *
+ * @typedef {object} StringIterator
+ * @property {Function} newlines -
+ * @property {Function} peek -
+ * @property {Function} remaining -
+ * @property {Function} skip -
+ * @property {Function} take -
+ */
+
+/**
+ * @param {string} str - String to iterate over
  * @returns {StringIterator}
  */
 exports.stringIterator = (str) => {
@@ -605,15 +556,23 @@ exports.stringIterator = (str) => {
     newlines: getnewLines,
   };
 };
+
 /**
+ * A custom made StringBuffer
  *
- * @returns {StringBuffer}
+ * @typedef {object} StringAssembler
+ * @property {Function} append -
+ * @property {Function} toString -
+ */
+
+/**
+ * @returns {StringAssembler}
  */
 exports.stringAssembler = () => {
   const pieces = [];
 
   /**
-   * @param {string} x
+   * @param {string} x -
    */
   const append = (x) => {
     pieces.push(String(x));
@@ -627,25 +586,41 @@ exports.stringAssembler = () => {
 };
 
 /**
+ * Class to iterate and modify texts which have several lines. It is used for applying Changesets on
+ * arrays of lines.
  *
- * @param {string[]} lines
- * @returns {TextMutator}
+ * Mutation operations have the same constraints as exports operations with respect to newlines, but
+ * not the other additional constraints (i.e. ins/del ordering, forbidden no-ops, non-mergeability,
+ * final newline). Can be used to mutate lists of strings where the last char of each string is not
+ * actually a newline, but for the purposes of N and L values, the caller should pretend it is, and
+ * for things to work right in that case, the input to the `insert` method should be a single line
+ * with no newlines.
+ *
+ * @typedef {object} TextLinesMutator
+ * @property {Function} close -
+ * @property {Function} hasMore -
+ * @property {Function} insert -
+ * @property {Function} remove -
+ * @property {Function} removeLines -
+ * @property {Function} skip -
+ * @property {Function} skipLines -
+ */
+
+/**
+ * @param {string[]} lines - Lines to mutate (in place). This does not need to be an array as long
+ *     as it supports certain methods/properties:
+ *       - `get(i)`: Returns the line at index `i`.
+ *       - `length`: Number like `Array.prototype.length`, or a method that returns the length.
+ *       - `slice(...)`: Like `Array.prototype.slice(...)`. Optional if the return value of the
+ *         `removeLines` method is not needed.
+ *       - `splice(...)`: Like `Array.prototype.splice(...)`.
+ * @returns {TextLinesMutator}
  */
 exports.textLinesMutator = (lines) => {
-  // Mutates lines, an array of strings, in place.
-  // Mutation operations have the same constraints as exports operations
-  // with respect to newlines, but not the other additional constraints
-  // (i.e. ins/del ordering, forbidden no-ops, non-mergeability, final newline).
-  // Can be used to mutate lists of strings where the last char of each string
-  // is not actually a newline, but for the purposes of N and L values,
-  // the caller should pretend it is, and for things to work right in that case, the input
-  // to insert() should be a single line with no newlines.
-
   // The splice holds information which lines are to be deleted or changed.
   // curSplice[0] is an index into the lines array
   // curSplice[1] is the number of lines that will be removed from lines
   // the other elements represent mutated (changed by ops) lines or new lines (added by ops)
-
   const curSplice = [0, 0];
   let inSplice = false;
 
@@ -658,19 +633,18 @@ exports.textLinesMutator = (lines) => {
   //            curCol == 0
 
   /**
-   * Adds and/or removes entries at a specific offset in lines array
-   * It is called when leaving the splice
+   * Adds and/or removes entries at a specific offset in `lines`. Called when leaving the splice.
    *
-   * @param {Array} s curSplice
+   * @param {Array} s - curSplice
    */
   const linesApplySplice = (s) => {
     lines.splice(...s);
   };
 
   /**
-   * Get a line from lines at given index
+   * Get a line from `lines` at given index.
    *
-   * @param {number} idx an index
+   * @param {number} idx - an index
    * @returns {string}
    */
   const linesGet = (idx) => {
@@ -680,13 +654,12 @@ exports.textLinesMutator = (lines) => {
       return lines[idx];
     }
   };
-  // can be unimplemented if removeLines's return value not needed
 
   /**
-   * Return a slice from lines array
+   * Return a slice from `lines`.
    *
-   * @param {number} start the start index
-   * @param {number} end the end index
+   * @param {number} start - the start index
+   * @param {number} end - the end index
    * @returns {string[]}
    */
   const linesSlice = (start, end) => {
@@ -698,7 +671,7 @@ exports.textLinesMutator = (lines) => {
   };
 
   /**
-   * Return the length of lines array
+   * Return the length of `lines`.
    *
    * @returns {number}
    */
@@ -725,9 +698,8 @@ exports.textLinesMutator = (lines) => {
   };
 
   /**
-   * Changes the lines array according to the values in curSplice
-   * and resets curSplice.
-   * This is called via close or TODO(doc)
+   * Changes the lines array according to the values in curSplice and resets curSplice. Called via
+   * close or TODO(doc).
    */
   const leaveSplice = () => {
     linesApplySplice(curSplice);
@@ -738,7 +710,7 @@ exports.textLinesMutator = (lines) => {
 
   /**
    * Indicates if curLine is already in the splice. This is necessary because the last element in
-   * curSplice is curLine when this line is currently worked on (e.g. when skipping are inserting)
+   * curSplice is curLine when this line is currently worked on (e.g. when skipping are inserting).
    *
    * TODO(doc) why aren't removals considered?
    *
@@ -747,8 +719,7 @@ exports.textLinesMutator = (lines) => {
   const isCurLineInSplice = () => (curLine - curSplice[0] < (curSplice.length - 2));
 
   /**
-   * Incorporates current line into the splice
-   * and marks its old position to be deleted.
+   * Incorporates current line into the splice and marks its old position to be deleted.
    *
    * @returns {number} the index of the added line in curSplice
    */
@@ -763,8 +734,8 @@ exports.textLinesMutator = (lines) => {
   /**
    * It will skip some newlines by putting them into the splice.
    *
-   * @param {number} L
-   * @param {boolean} includeInSplice indicates if attributes are present
+   * @param {number} L -
+   * @param {boolean} includeInSplice - indicates if attributes are present
    */
   const skipLines = (L, includeInSplice) => {
     if (L) {
@@ -797,9 +768,9 @@ exports.textLinesMutator = (lines) => {
   /**
    * Skip some characters. Can contain newlines.
    *
-   * @param {number} N number of characters to skip
-   * @param {number} L number of newlines to skip
-   * @param {boolean} includeInSplice indicates if attributes are present
+   * @param {number} N - number of characters to skip
+   * @param {number} L - number of newlines to skip
+   * @param {boolean} includeInSplice - indicates if attributes are present
    */
   const skip = (N, L, includeInSplice) => {
     if (N) {
@@ -820,9 +791,9 @@ exports.textLinesMutator = (lines) => {
   };
 
   /**
-   * Remove whole lines from lines array
+   * Remove whole lines from lines array.
    *
-   * @param {number} L number of lines to be removed
+   * @param {number} L - number of lines to remove
    * @returns {string}
    */
   const removeLines = (L) => {
@@ -833,9 +804,9 @@ exports.textLinesMutator = (lines) => {
       }
 
       /**
-       * Gets a string of joined lines after the end of the splice
+       * Gets a string of joined lines after the end of the splice.
        *
-       * @param {number} k number of lines
+       * @param {number} k - number of lines
        * @returns {string} joined lines
        */
       const nextKLinesText = (k) => {
@@ -866,10 +837,10 @@ exports.textLinesMutator = (lines) => {
   };
 
   /**
-   * Remove text from lines array
+   * Remove text from lines array.
    *
-   * @param {number} N characters to delete
-   * @param {number} L lines to delete
+   * @param {number} N - characters to delete
+   * @param {number} L - lines to delete
    * @returns {string}
    */
   const remove = (N, L) => {
@@ -895,8 +866,8 @@ exports.textLinesMutator = (lines) => {
   /**
    * Inserts text into lines array.
    *
-   * @param {string} text the text to insert
-   * @param {number} L number of newlines in text
+   * @param {string} text - the text to insert
+   * @param {number} L - number of newlines in text
    */
   const insert = (text, L) => {
     if (text) {
@@ -940,8 +911,7 @@ exports.textLinesMutator = (lines) => {
   };
 
   /**
-   * Checks if curLine (the line we are in when curSplice is applied) is the last line
-   * in lines.
+   * Checks if curLine (the line we are in when curSplice is applied) is the last line in `lines`.
    *
    * @returns {boolean} indicates if there are lines left
    */
@@ -975,19 +945,26 @@ exports.textLinesMutator = (lines) => {
 };
 
 /**
- * Function allowing iterating over two Op strings.
+ * Apply operations to other operations.
  *
- * @param {string} in1 first Op string
- * @param {number} idx1 integer where 1st iterator should start
- * @param {string} in2 second Op string
- * @param {number} idx2 integer where 2nd iterator should start
- * @param {Function} func which decides how 1st or 2nd iterator
- *         advances. When opX.opcode = 0, iterator X advances to
- *         next element
- *         func has signature f(op1, op2, opOut)
- *             op1 - current operation of the first iterator
- *             op2 - current operation of the second iterator
- *             opOut - result operator to be put into Changeset
+ * @param {string} in1 - first Op string
+ * @param {number} idx1 - integer where 1st iterator should start
+ * @param {string} in2 - second Op string
+ * @param {number} idx2 - integer where 2nd iterator should start
+ * @param {Function} func - Callback that applies an operation to another operation. Will be called
+ *     multiple times depending on the number of operations in `in1` and `in2`. `func` has signature
+ *     `f(op1, op2, opOut)`:
+ *       - `op1` is the current operation from `in1`. `func` is expected to mutate `op1` to
+ *         partially or fully consume it, and MUST set `op1.opcode` to the empty string once `op1`
+ *         is fully consumed. If `op1` is not fully consumed, `func` will be called again with the
+ *         same `op1` value. If `op1` is fully consumed, the next call to `func` will be given the
+ *         next operation from `in1`. If there are no more operations in `in1`, `op1.opcode` will be
+ *         the empty string.
+ *       - `op2` is the current operation from `in2`, to apply to `op1`. Has the same consumption
+ *         and advancement semantics as `op1`.
+ *       - `opOut` MUST be mutated to reflect the result of applying `op2` (before consumption) to
+ *         `op1` (before consumption). If there is no result (perhaps `op1` and `op2` cancelled each
+ *         other out), `opOut.opcode` MUST be set to the empty string.
  * @returns {string} the integrated changeset
  */
 exports.applyZip = (in1, idx1, in2, idx2, func) => {
@@ -1011,10 +988,10 @@ exports.applyZip = (in1, idx1, in2, idx2, func) => {
 };
 
 /**
- * Unpacks a string encoded Changeset into a proper Changeset object
+ * Parses an encoded changeset.
  *
- * @param {string} cs String encoded Changeset
- * @returns {Changeset} a Changeset class
+ * @param {string} cs - The encoded changeset.
+ * @returns {Changeset}
  */
 exports.unpack = (cs) => {
   const headerRegex = /Z:([0-9a-z]+)([><])([0-9a-z]+)|/;
@@ -1038,13 +1015,13 @@ exports.unpack = (cs) => {
 };
 
 /**
- * Packs Changeset object into a string
+ * Creates an encoded changeset.
  *
- * @param {number} oldLen Old length of the Changeset
- * @param {number} newLen New length of the Changeset
- * @param {string} opsStr String encoding of the changes to be made
- * @param {string} bank Charbank of the Changeset
- * @returns {string} a Changeset
+ * @param {number} oldLen - The length of the document before applying the changeset.
+ * @param {number} newLen - The length of the document after applying the changeset.
+ * @param {string} opsStr - Encoded operations to apply to the document.
+ * @param {string} bank - Characters for insert operations.
+ * @returns {string} The encoded changeset.
  */
 exports.pack = (oldLen, newLen, opsStr, bank) => {
   const lenDiff = newLen - oldLen;
@@ -1056,10 +1033,10 @@ exports.pack = (oldLen, newLen, opsStr, bank) => {
 };
 
 /**
- * Applies a Changeset to a string
+ * Applies a Changeset to a string.
  *
- * @param {string} cs String encoded Changeset
- * @param {string} str String to which a Changeset should be applied
+ * @param {string} cs - String encoded Changeset
+ * @param {string} str - String to which a Changeset should be applied
  * @returns {string}
  */
 exports.applyToText = (cs, str) => {
@@ -1104,10 +1081,10 @@ exports.applyToText = (cs, str) => {
 };
 
 /**
- * applies a changeset on an array of lines
+ * Applies a changeset on an array of lines.
  *
- * @param {string} cs the changeset to be applied
- * @param {string[]} lines The lines to which the changeset needs to be applied
+ * @param {string} cs - the changeset to apply
+ * @param {string[]} lines - The lines to which the changeset needs to be applied
  */
 exports.mutateTextLines = (cs, lines) => {
   const unpacked = exports.unpack(cs);
@@ -1134,10 +1111,10 @@ exports.mutateTextLines = (cs, lines) => {
 /**
  * Composes two attribute strings (see below) into one.
  *
- * @param {string} att1 first attribute string
- * @param {string} att2 second attribue string
- * @param {boolean} resultIsMutation
- * @param {AttribPool} pool attribute pool
+ * @param {string} att1 - first attribute string
+ * @param {string} att2 - second attribue string
+ * @param {boolean} resultIsMutation -
+ * @param {AttributePool} pool - attribute pool
  * @returns {string}
  */
 exports.composeAttributes = (att1, att2, resultIsMutation, pool) => {
@@ -1197,18 +1174,15 @@ exports.composeAttributes = (att1, att2, resultIsMutation, pool) => {
 };
 
 /**
- * Function used as parameter for applyZip to apply a Changeset to an
- * attribute
+ * Function used as parameter for applyZip to apply a Changeset to an attribute.
  *
- * @param {Opcode} attOp
- * @param {Opcode} csOp
- * @param {Opcode} opOut
- * @param {AttribPool} pool
+ * @param {Op} attOp - The op from the sequence that is being operated on, either an attribution
+ *     string or the earlier of two exportss being composed.
+ * @param {Op} csOp -
+ * @param {Op} opOut - Mutated to hold the result of applying `csOp` to `attOp`.
+ * @param {AttributePool} pool - Can be null if definitely not needed.
  */
 exports._slicerZipperFunc = (attOp, csOp, opOut, pool) => {
-  // attOp is the op from the sequence that is being operated on, either an
-  // attribution string or the earlier of two exportss being composed.
-  // pool can be null if definitely not needed.
   if (attOp.opcode === '-') {
     exports.copyOp(attOp, opOut);
     attOp.opcode = '';
@@ -1295,9 +1269,9 @@ exports._slicerZipperFunc = (attOp, csOp, opOut, pool) => {
 /**
  * Applies a Changeset to the attribs string of a AText.
  *
- * @param {string} cs Changeset
- * @param {string} astr the attribs string of a AText
- * @param {AttribPool} pool the attibutes pool
+ * @param {string} cs - Changeset
+ * @param {string} astr - the attribs string of a AText
+ * @param {AttributePool} pool - the attibutes pool
  * @returns {string}
  */
 exports.applyToAttribution = (cs, astr, pool) => {
@@ -1391,9 +1365,9 @@ exports.mutateAttributionLines = (cs, lines, pool) => {
 };
 
 /**
- * joins several Attribution lines
+ * Joins several Attribution lines.
  *
- * @param {string[]} theAlines collection of Attribution lines
+ * @param {string[]} theAlines - collection of Attribution lines
  * @returns {string} joined Attribution lines
  */
 exports.joinAttributionLines = (theAlines) => {
@@ -1447,19 +1421,19 @@ exports.splitAttributionLines = (attrOps, text) => {
 };
 
 /**
- * splits text into lines
+ * Splits text into lines.
  *
- * @param {string} text to be splitted
+ * @param {string} text - text to split
  * @returns {string[]}
  */
 exports.splitTextLines = (text) => text.match(/[^\n]*(?:\n|[^\n]$)/g);
 
 /**
- * compose two Changesets
+ * Compose two Changesets.
  *
- * @param {string} cs1 first Changeset
- * @param {string} cs2 second Changeset
- * @param {AttribPool} pool Attribs pool
+ * @param {string} cs1 - first Changeset
+ * @param {string} cs2 - second Changeset
+ * @param {AttributePool} pool - Attribs pool
  * @returns {string}
  */
 exports.compose = (cs1, cs2, pool) => {
@@ -1493,12 +1467,11 @@ exports.compose = (cs1, cs2, pool) => {
 };
 
 /**
- * returns a function that tests if a string of attributes
- * (e.g. *3*4) contains a given attribute key,value that
- * is already present in the pool.
+ * Returns a function that tests if a string of attributes (e.g. '*3*4') contains a given attribute
+ * key,value that is already present in the pool.
  *
- * @param {Array<string,string>} attribPair of the attribute
- * @param {AttribPool} pool Attribute pool
+ * @param {Array<[string,string]>} attribPair - Array of attribute pairs.
+ * @param {AttributePool} pool - Attribute pool
  * @returns {Function}
  */
 exports.attributeTester = (attribPair, pool) => {
@@ -1516,26 +1489,24 @@ exports.attributeTester = (attribPair, pool) => {
 };
 
 /**
- * creates the identity Changeset of length N
+ * Creates the identity Changeset of length N.
  *
- * @param {number} N length of the identity changeset
+ * @param {number} N - length of the identity changeset
  * @returns {string}
  */
 exports.identity = (N) => exports.pack(N, N, '', '');
 
-
 /**
- * creates a Changeset which works on oldFullText and removes text
- * from spliceStart to spliceStart+numRemoved and inserts newText
- * instead. Also gives possibility to add attributes optNewTextAPairs
- * for the new text.
+ * Creates a Changeset which works on oldFullText and removes text from spliceStart to
+ * spliceStart+numRemoved and inserts newText instead. Also gives possibility to add attributes
+ * optNewTextAPairs for the new text.
  *
- * @param {string} oldFullText old text
- * @param {number} spliceStart where splicing starts
- * @param {number} numRemoved number of characters to be removed
- * @param {string} newText string to be inserted
- * @param {string} optNewTextAPairs new pairs to be inserted
- * @param {AttribPool} pool Attribution Pool
+ * @param {string} oldFullText - old text
+ * @param {number} spliceStart - where splicing starts
+ * @param {number} numRemoved - number of characters to remove
+ * @param {string} newText - string to insert
+ * @param {string} optNewTextAPairs - new pairs to insert
+ * @param {AttributePool} pool - Attribute pool
  * @returns {string}
  */
 exports.makeSplice = (oldFullText, spliceStart, numRemoved, newText, optNewTextAPairs, pool) => {
@@ -1559,15 +1530,13 @@ exports.makeSplice = (oldFullText, spliceStart, numRemoved, newText, optNewTextA
 };
 
 /**
- * Transforms a changeset into a list of splices in the form
- * [startChar, endChar, newText] meaning replace text from
- * startChar to endChar with newText
+ * Transforms a changeset into a list of splices in the form [startChar, endChar, newText] meaning
+ * replace text from startChar to endChar with newText.
  *
- * @param {string} cs Changeset
- * @returns {Array<number,number,string>}
+ * @param {string} cs - Changeset
+ * @returns {Array<[number,number,string]>}
  */
 exports.toSplices = (cs) => {
-  //
   const unpacked = exports.unpack(cs);
   const splices = [];
 
@@ -1598,11 +1567,11 @@ exports.toSplices = (cs) => {
 };
 
 /**
- * @param {string} cs
- * @param {number} startChar
- * @param {number} endChar
- * @param {number} insertionsAfter
- * @returns {Array<number,number>}
+ * @param {string} cs -
+ * @param {number} startChar -
+ * @param {number} endChar -
+ * @param {number} insertionsAfter -
+ * @returns {Array<[number,number]>}
  */
 exports.characterRangeFollow = (cs, startChar, endChar, insertionsAfter) => {
   let newStartChar = startChar;
@@ -1649,12 +1618,11 @@ exports.characterRangeFollow = (cs, startChar, endChar, insertionsAfter) => {
 };
 
 /**
- * Iterate over attributes in a changeset and move them from
- * oldPool to newPool
+ * Iterate over attributes in a changeset and move them from oldPool to newPool.
  *
- * @param {string} cs Chageset/attribution string to be iterated over
- * @param {AttribPool} oldPool old attributes pool
- * @param {AttribPool} newPool new attributes pool
+ * @param {string} cs - Chageset/attribution string to iterate over
+ * @param {AttributePool} oldPool - old attributes pool
+ * @param {AttributePool} newPool - new attributes pool
  * @returns {string} the new Changeset
  */
 exports.moveOpsToNewPool = (cs, oldPool, newPool) => {
@@ -1686,9 +1654,9 @@ exports.moveOpsToNewPool = (cs, oldPool, newPool) => {
 };
 
 /**
- * create an attribution inserting a text
+ * Create an attribution inserting a text.
  *
- * @param {string} text text to be inserted
+ * @param {string} text - text to insert
  * @returns {string}
  */
 exports.makeAttribution = (text) => {
@@ -1698,11 +1666,11 @@ exports.makeAttribution = (text) => {
 };
 
 /**
- * Iterates over attributes in exports, attribution string, or attribs property of an op
- * and runs function func on them
+ * Iterates over attributes in exports, attribution string, or attribs property of an op and runs
+ * function func on them.
  *
- * @param {string} cs changeset
- * @param {Function} func function to be called
+ * @param {string} cs - changeset
+ * @param {Function} func - function to call
  */
 exports.eachAttribNumber = (cs, func) => {
   let dollarPos = cs.indexOf('$');
@@ -1718,22 +1686,21 @@ exports.eachAttribNumber = (cs, func) => {
 };
 
 /**
- * Filter attributes which should remain in a Changeset
- * callable on a exports, attribution string, or attribs property of an op,
- * though it may easily create adjacent ops that can be merged.
+ * Filter attributes which should remain in a Changeset. Callable on a exports, attribution string,
+ * or attribs property of an op, though it may easily create adjacent ops that can be merged.
  *
- * @param {string} cs changeset to be filtered
- * @param {Function} filter fnc which returns true if an
- *        attribute X (int) should be kept in the Changeset
+ * @param {string} cs - changeset to filter
+ * @param {Function} filter - fnc which returns true if an attribute X (int) should be kept in the
+ *     Changeset
  * @returns {string}
  */
 exports.filterAttribNumbers = (cs, filter) => exports.mapAttribNumbers(cs, filter);
 
 /**
- * does exactly the same as exports.filterAttribNumbers
+ * Does exactly the same as exports.filterAttribNumbers.
  *
- * @param {string} cs
- * @param {Function} func
+ * @param {string} cs -
+ * @param {Function} func -
  * @returns {string}
  */
 exports.mapAttribNumbers = (cs, func) => {
@@ -1758,11 +1725,17 @@ exports.mapAttribNumbers = (cs, func) => {
 };
 
 /**
- * Create a Changeset going from Identity to a certain state
+ * @typedef {object} AText
+ * @property {string} attribs -
+ * @property {string} text -
+ */
+
+/**
+ * Create a Changeset going from Identity to a certain state.
  *
- * @param {string} text text of the final change
- * @param {string} attribs optional, operations which insert
- *    the text and also puts the right attributes
+ * @param {string} text - text of the final change
+ * @param {string} attribs - optional, operations which insert the text and also puts the right
+ *     attributes
  * @returns {AText}
  */
 exports.makeAText = (text, attribs) => ({
@@ -1771,11 +1744,11 @@ exports.makeAText = (text, attribs) => ({
 });
 
 /**
- * Apply a Changeset to a AText
+ * Apply a Changeset to a AText.
  *
- * @param {string} cs Changeset to be applied
- * @param {AText} atext
- * @param {AttribPool} pool Attribute Pool to add to
+ * @param {string} cs - Changeset to apply
+ * @param {AText} atext -
+ * @param {AttributePool} pool - Attribute Pool to add to
  * @returns {AText}
  */
 exports.applyToAText = (cs, atext, pool) => ({
@@ -1784,9 +1757,9 @@ exports.applyToAText = (cs, atext, pool) => ({
 });
 
 /**
- * Clones a AText structure
+ * Clones a AText structure.
  *
- * @param {AText} atext
+ * @param {AText} atext -
  * @returns {AText}
  */
 exports.cloneAText = (atext) => {
@@ -1799,10 +1772,10 @@ exports.cloneAText = (atext) => {
 };
 
 /**
- * Copies a AText structure from atext1 to atext2
+ * Copies a AText structure from atext1 to atext2.
  *
- * @param {AText} atext1
- * @param {AText} atext2
+ * @param {AText} atext1 -
+ * @param {AText} atext2 -
  */
 exports.copyAText = (atext1, atext2) => {
   atext2.text = atext1.text;
@@ -1810,10 +1783,10 @@ exports.copyAText = (atext1, atext2) => {
 };
 
 /**
- * Append the set of operations from atext to an assembler
+ * Append the set of operations from atext to an assembler.
  *
- * @param {AText} atext
- * @param assem Assembler like smartOpAssembler TODO add desc
+ * @param {AText} atext -
+ * @param assem - Assembler like SmartOpAssembler TODO add desc
  */
 exports.appendATextToAssembler = (atext, assem) => {
   // intentionally skips last newline char of atext
@@ -1849,11 +1822,11 @@ exports.appendATextToAssembler = (atext, assem) => {
 };
 
 /**
- * Creates a clone of a Changeset and it's APool
+ * Creates a clone of a Changeset and it's APool.
  *
- * @param {string} cs
- * @param {AttribPool} pool
- * @returns {{translated: string, pool: AttribPool}}
+ * @param {string} cs -
+ * @param {AttributePool} pool -
+ * @returns {{translated: string, pool: AttributePool}}
  */
 exports.prepareForWire = (cs, pool) => {
   const newPool = new AttributePool();
@@ -1865,9 +1838,9 @@ exports.prepareForWire = (cs, pool) => {
 };
 
 /**
- * Checks if a changeset s the identity changeset
+ * Checks if a changeset s the identity changeset.
  *
- * @param {string} cs
+ * @param {string} cs -
  * @returns {boolean}
  */
 exports.isIdentity = (cs) => {
@@ -1876,23 +1849,21 @@ exports.isIdentity = (cs) => {
 };
 
 /**
- * returns all the values of attributes with a certain key
- * in an Op attribs string
+ * Returns all the values of attributes with a certain key in an Op attribs string.
  *
- * @param {Opcode} op Op
- * @param {string} key string to be searched for
- * @param {AttribPool} pool attribute pool
+ * @param {Op} op - Op
+ * @param {string} key - string to search for
+ * @param {AttributePool} pool - attribute pool
  * @returns {string}
  */
 exports.opAttributeValue = (op, key, pool) => exports.attribsAttributeValue(op.attribs, key, pool);
 
 /**
- * returns all the values of attributes with a certain key
- * in an attribs string
+ * Returns all the values of attributes with a certain key in an attribs string.
  *
- * @param {string} attribs Attribute string
- * @param {string} key string to be seached for
- * @param {AttribPool} pool attribute pool
+ * @param {string} attribs - Attribute string
+ * @param {string} key - string to search for
+ * @param {AttributePool} pool - attribute pool
  * @returns {string}
  */
 exports.attribsAttributeValue = (attribs, key, pool) => {
@@ -1908,14 +1879,19 @@ exports.attribsAttributeValue = (attribs, key, pool) => {
 };
 
 /**
- * Creates a Changeset builder for a string with initial
- * length oldLen. Allows to add/remove parts of it
+ * Incrementally builds a Changeset.
  *
+ * @typedef {object} Builder
+ * @property {Function} insert -
+ * @property {Function} keep -
+ * @property {Function} keepText -
+ * @property {Function} remove -
+ * @property {Function} toString -
  */
+
 /**
- *
- * @param {number} oldLen Old length
- * @returns {ChangesetBuilder}
+ * @param {number} oldLen - Old length
+ * @returns {Builder}
  */
 exports.builder = (oldLen) => {
   const assem = exports.smartOpAssembler();
@@ -1923,7 +1899,10 @@ exports.builder = (oldLen) => {
   const charBank = exports.stringAssembler();
 
   const self = {
-    // attribs are [[key1,value1],[key2,value2],...] or '*0*1...' (no pool needed in latter case)
+    /**
+     * @param attribs - Either [[key1,value1],[key2,value2],...] or '*0*1...' (no pool needed in
+     *     latter case).
+     */
     keep: (N, L, attribs, pool) => {
       o.opcode = '=';
       o.attribs = (attribs && exports.makeAttribsString('=', attribs, pool)) || '';
@@ -1981,7 +1960,9 @@ exports.makeAttribsString = (opcode, attribs, pool) => {
   }
 };
 
-// like "substring" but on a single-line attribution string
+/**
+ * Like "substring" but on a single-line attribution string.
+ */
 exports.subattribution = (astr, start, optEnd) => {
   const iter = exports.opIterator(astr, 0);
   const assem = exports.smartOpAssembler();
@@ -2044,7 +2025,7 @@ exports.inverse = (cs, lines, alines, pool) => {
   };
 
   /**
-   * @param {number} idx
+   * @param {number} idx -
    * @returns {string}
    */
   const alinesGet = (idx) => {
