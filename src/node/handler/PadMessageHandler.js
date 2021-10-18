@@ -574,8 +574,7 @@ const handleUserChanges = async (socket, message) => {
   // create the changeset
   try {
     try {
-      // Verify that the changeset has valid syntax and is in canonical form
-      Changeset.checkRep(changeset);
+      const cs = Changeset.unpack(changeset).validate();
 
       // Verify that the attribute indexes used in the changeset are all
       // defined in the accompanying attribute pool.
@@ -586,7 +585,7 @@ const handleUserChanges = async (socket, message) => {
       });
 
       // Validate all added 'author' attribs to be the same value as the current user
-      for (const op of new Changeset.OpIter(Changeset.unpack(changeset).ops)) {
+      for (const op of new Changeset.OpIter(cs.ops)) {
         // + can add text with attribs
         // = can change or add attribs
         // - can have attribs, but they are discarded and don't show up in the attribs -

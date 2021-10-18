@@ -183,7 +183,7 @@ const makeChangesetTracker = (scheduler, apool, aceCallbacksProvider) => {
           }
           const serializedOps = Changeset.serializeOps(Changeset.squashOps(ops, true));
           userChangeset = Changeset.pack(cs.oldLen, cs.newLen, serializedOps, cs.charBank);
-          Changeset.checkRep(userChangeset);
+          userChangeset.validate();
         }
         if (Changeset.isIdentity(userChangeset)) toSubmit = null;
         else toSubmit = userChangeset;

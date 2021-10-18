@@ -187,7 +187,8 @@ describe('easysync', function () {
   const runApplyToAttributionTest = (testId, attribs, cs, inAttr, outCorrect) => {
     it(`applyToAttribution#${testId}`, async function () {
       const p = poolOrArray(attribs);
-      const result = Changeset.applyToAttribution(Changeset.checkRep(cs), inAttr, p);
+      Changeset.unpack(cs).validate();
+      const result = Changeset.applyToAttribution(cs, inAttr, p);
       expect(result).to.equal(outCorrect);
     });
   };
@@ -244,7 +245,8 @@ describe('easysync', function () {
     it(`runMutateAttributionTest#${testId}`, async function () {
       const p = poolOrArray(attribs);
       const alines2 = Array.prototype.slice.call(alines);
-      Changeset.mutateAttributionLines(Changeset.checkRep(cs), alines2, p);
+      Changeset.unpack(cs).validate();
+      Changeset.mutateAttributionLines(cs, alines2, p);
       expect(alines2).to.eql(outCorrect);
 
       const removeQuestionMarks = (a) => a.replace(/\?/g, '');
@@ -531,7 +533,7 @@ describe('easysync', function () {
     const outText = `${outTextAssem}\n`;
     const serializedOps = Changeset.serializeOps(Changeset.canonicalizeOps(ops, true));
     const cs = Changeset.pack(oldLen, outText.length, serializedOps, charBank);
-    Changeset.checkRep(cs);
+    Changeset.unpack(cs).validate();
     return [cs, outText];
   };
 
@@ -553,10 +555,14 @@ describe('easysync', function () {
       const change3 = x3[0];
       const text3 = x3[1];
 
-      const change12 = Changeset.checkRep(Changeset.compose(change1, change2, p));
-      const change23 = Changeset.checkRep(Changeset.compose(change2, change3, p));
-      const change123 = Changeset.checkRep(Changeset.compose(change12, change3, p));
-      const change123a = Changeset.checkRep(Changeset.compose(change1, change23, p));
+      const change12 = Changeset.compose(change1, change2, p);
+      Changeset.unpack(change12).validate();
+      const change23 = Changeset.compose(change2, change3, p);
+      Changeset.unpack(change23).validate();
+      const change123 = Changeset.compose(change12, change3, p);
+      Changeset.unpack(change123).validate();
+      const change123a = Changeset.compose(change1, change23, p);
+      Changeset.unpack(change123a).validate();
       expect(change123a).to.equal(change123);
 
       expect(Changeset.applyToText(change12, startText)).to.equal(text2);
@@ -571,9 +577,12 @@ describe('easysync', function () {
     const p = new AttributePool();
     p.putAttrib(['bold', '']);
     p.putAttrib(['bold', 'true']);
-    const cs1 = Changeset.checkRep('Z:2>1*1+1*1=1$x');
-    const cs2 = Changeset.checkRep('Z:3>0*0|1=3$');
-    const cs12 = Changeset.checkRep(Changeset.compose(cs1, cs2, p));
+    const cs1 = 'Z:2>1*1+1*1=1$x';
+    Changeset.unpack(cs1).validate();
+    const cs2 = 'Z:3>0*0|1=3$';
+    Changeset.unpack(cs2).validate();
+    const cs12 = Changeset.compose(cs1, cs2, p);
+    Changeset.unpack(cs12).validate();
     expect(cs12).to.equal('Z:2>1+1*0|1=2$x');
   });
 
@@ -615,11 +624,15 @@ describe('easysync', function () {
       const cs1 = randomTestChangeset(startText)[0];
       const cs2 = randomTestChangeset(startText)[0];
 
-      const afb = Changeset.checkRep(Changeset.follow(cs1, cs2, false, p));
-      const bfa = Changeset.checkRep(Changeset.follow(cs2, cs1, true, p));
+      const afb = Changeset.follow(cs1, cs2, false, p);
+      Changeset.unpack(afb).validate();
+      const bfa = Changeset.follow(cs2, cs1, true, p);
+      Changeset.unpack(bfa).validate();
 
-      const merge1 = Changeset.checkRep(Changeset.compose(cs1, afb));
-      const merge2 = Changeset.checkRep(Changeset.compose(cs2, bfa));
+      const merge1 = Changeset.compose(cs1, afb);
+      Changeset.unpack(merge1).validate();
+      const merge2 = Changeset.compose(cs2, bfa);
+      Changeset.unpack(merge2).validate();
 
       expect(merge2).to.equal(merge1);
     });
@@ -675,7 +688,8 @@ describe('easysync', function () {
   });
 
   it('testToSplices', async function () {
-    const cs = Changeset.checkRep('Z:z>9*0=1=4-3+9=1|1-4-4+1*0+a$123456789abcdefghijk');
+    const cs = 'Z:z>9*0=1=4-3+9=1|1-4-4+1*0+a$123456789abcdefghijk';
+    Changeset.unpack(cs).validate();
     const correctSplices = [
       [5, 8, '123456789'],
       [9, 17, 'abcdefghijk'],
@@ -685,7 +699,7 @@ describe('easysync', function () {
 
   const testCharacterRangeFollow = (testId, cs, oldRange, insertionsAfter, correctNewRange) => {
     it(`testCharacterRangeFollow#${testId}`, async function () {
-      cs = Changeset.checkRep(cs);
+      Changeset.unpack(cs).validate();
       expect(Changeset.characterRangeFollow(cs, oldRange[0], oldRange[1], insertionsAfter))
           .to.eql(correctNewRange);
     });
@@ -850,7 +864,8 @@ describe('easysync', function () {
   const testInverse = (testId, cs, lines, alines, pool, correctOutput) => {
     it(`testInverse#${testId}`, async function () {
       pool = poolOrArray(pool);
-      const str = Changeset.inverse(Changeset.checkRep(cs), lines, alines, pool);
+      Changeset.unpack(cs).validate();
+      const str = Changeset.inverse(cs, lines, alines, pool);
       expect(str).to.equal(correctOutput);
     });
   };
