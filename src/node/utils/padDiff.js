@@ -456,9 +456,7 @@ PadDiff.prototype._createDeletionChangeset = function (cs, startAText, apool) {
     }
   }
 
-  const packed = builder.toString();
-  Changeset.unpack(packed).validate();
-  return packed;
+  return builder.build().validate().toString();
 };
 
 // export the constructor

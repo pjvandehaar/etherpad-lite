@@ -1970,13 +1970,20 @@ exports.Builder = class {
     return this;
   }
 
-  toString() {
+  /**
+   * @returns {Changeset}
+   */
+  build() {
     let lengthChange;
     const serializedOps = exports.serializeOps((function* () {
       lengthChange = yield* exports.canonicalizeOps(this._ops, true);
     }).call(this));
     const newLen = this._oldLen + lengthChange;
-    return new Changeset(this._oldLen, newLen, serializedOps, this._charBank).toString();
+    return new Changeset(this._oldLen, newLen, serializedOps, this._charBank);
+  }
+
+  toString() {
+    return this.build().toString();
   }
 };
 
@@ -2195,9 +2202,7 @@ exports.inverse = (cs, lines, alines, pool) => {
     }
   }
 
-  const packed = builder.toString();
-  Changeset.unpack(packed).validate();
-  return packed;
+  return builder.build().validate().toString();
 };
 
 // %CLIENT FILE ENDS HERE%
