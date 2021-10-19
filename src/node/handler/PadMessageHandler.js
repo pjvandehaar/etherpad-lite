@@ -654,11 +654,12 @@ const handleUserChanges = async (socket, message) => {
 
     const prevText = pad.text();
 
-    if (Changeset.oldLen(changeset) !== prevText.length) {
+    if (Changeset.unpack(changeset).oldLen !== prevText.length) {
       socket.json.send({disconnect: 'badChangeset'});
       stats.meter('failedChangesets').mark();
-      throw new Error(`Can't apply USER_CHANGES ${changeset} with oldLen ` +
-                      `${Changeset.oldLen(changeset)} to document of length ${prevText.length}`);
+      throw new Error(
+          `Can't apply USER_CHANGES ${changeset} with oldLen ` +
+          `${Changeset.unpack(changeset).oldLen} to document of length ${prevText.length}`);
     }
 
     try {
